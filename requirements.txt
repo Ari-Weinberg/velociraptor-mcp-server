@@ -1,0 +1,7 @@
+click>=8.0
+fastmcp>=0.4
+httpx[http2]>=0.27
+pydantic>=2.7
+python-dotenv>=1.0.0
+PyYAML>=6.0
+uvicorn[standard]>=0.30
