@@ -17,7 +17,7 @@ async def main():
     # Connect to Wazuh MCP server and create agent
     client = MultiServerMCPClient(
         {
-            "wazuh-mcp-server": {
+            "velociraptor-mcp-server": {
                 "transport": "sse",
                 "url": "http://127.0.0.1:8000/sse/",  # Your Wazuh MCP server SSE endpoint
                 "headers": {
@@ -39,14 +39,10 @@ async def main():
         verbose=True,  # Enables detailed output of the agent's thought process
     )
 
-    # Example queries for Wazuh
-    print("\n=== Testing Authentication ===")
-    await agent.ainvoke({"input": "Authenticate with Wazuh to get a new JWT token"})
-
     print("\n=== Testing Get Agents ===")
     await agent.ainvoke(
         {
-            "input": "Show me all agents and their IP addresses.",
+            "input": "Give me the client details for the piHole client.",
         },
     )
 

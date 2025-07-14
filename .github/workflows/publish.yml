@@ -43,25 +43,25 @@ jobs:
 
     - name: Lint with flake8
       run: |
-        flake8 wazuh_mcp_server --count --select=E9,F63,F7,F82 --show-source --statistics
-        flake8 wazuh_mcp_server --count --exit-zero --max-complexity=10 --max-line-length=100 --statistics
+        flake8 velociraptor_mcp_server --count --select=E9,F63,F7,F82 --show-source --statistics
+        flake8 velociraptor_mcp_server --count --exit-zero --max-complexity=10 --max-line-length=100 --statistics
 
     - name: Check code formatting with black
       run: |
-        black --check wazuh_mcp_server
+        black --check velociraptor_mcp_server
 
     - name: Check import sorting with isort
       run: |
-        isort --check-only wazuh_mcp_server
+        isort --check-only velociraptor_mcp_server
 
     - name: Type check with mypy
       run: |
-        mypy wazuh_mcp_server --ignore-missing-imports
+        mypy velociraptor_mcp_server --ignore-missing-imports
       continue-on-error: true
 
     - name: Test with pytest
       run: |
-        pytest --cov=wazuh_mcp_server --cov-report=xml --cov-report=term-missing
+        pytest --cov=velociraptor_mcp_server --cov-report=xml --cov-report=term-missing
       continue-on-error: true
 
   build:
@@ -106,18 +106,16 @@ jobs:
         pip install dist/*.whl
 
         # Test imports
-        python -c "import wazuh_mcp_server; print('✅ Package imports successfully')"
-        python -c "from wazuh_mcp_server import Config, WazuhClient, WazuhMCPServer; print('✅ Main classes importable')"
+        python -c "import velociraptor_mcp_server; print('✅ Package imports successfully')"
+        python -c "from velociraptor_mcp_server import Config, VelociraptorClient, VelociraptorMCPServer; print('✅ Main classes importable')"
 
         # Test CLI commands
-        python -m wazuh_mcp_server --help
-        wazuh-mcp-server --version
+        python -m velociraptor_mcp_server --help
+        velociraptor-mcp-server --version
 
         # Test with example env vars (should fail gracefully)
-        export WAZUH_PROD_URL=""
-        export WAZUH_PROD_USERNAME=""
-        export WAZUH_PROD_PASSWORD=""
-        python -c "from wazuh_mcp_server import Config; print('✅ Config module works')"
+        export VELOCIRAPTOR_API_KEY=""
+        python -c "from velociraptor_mcp_server import Config; print('✅ Config module works')"
 
         deactivate
 
@@ -130,9 +128,9 @@ jobs:
 
     - name: Generate package info
       run: |
-        echo "## 📦 Wazuh MCP Server Package" > package_info.md
+        echo "## 📦 Velociraptor MCP Server Package" > package_info.md
         echo "" >> package_info.md
-        echo "A production-ready Model Context Protocol server for Wazuh Manager integration." >> package_info.md
+        echo "A production-ready Model Context Protocol server for Velociraptor DFIR integration." >> package_info.md
         echo "" >> package_info.md
         echo "### 🚀 Installation Options" >> package_info.md
         echo "" >> package_info.md
@@ -158,8 +156,8 @@ jobs:
         echo "### 🔧 Usage" >> package_info.md
         echo '```bash' >> package_info.md
         echo "# Run the server" >> package_info.md
-        echo "wazuh-mcp-server --help" >> package_info.md
-        echo "python -m wazuh_mcp_server --port 8000" >> package_info.md
+        echo "velociraptor-mcp-server --help" >> package_info.md
+        echo "python -m velociraptor_mcp_server --port 8000" >> package_info.md
         echo '```' >> package_info.md
         echo "" >> package_info.md
         echo "### 📋 Built Files" >> package_info.md

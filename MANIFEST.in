@@ -3,8 +3,8 @@ include LICENSE
 include requirements.txt
 include requirements.in
 include .env.example
-recursive-include wazuh_mcp_server *.py
-recursive-include wazuh_mcp_server py.typed
+recursive-include velociraptor_mcp_server *.py
+recursive-include velociraptor_mcp_server py.typed
 prune tests
 prune .github
 prune .venv

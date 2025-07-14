@@ -7,8 +7,8 @@ from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 
-from wazuh_mcp_server.config import Config
-from wazuh_mcp_server.server import WazuhMCPServer, create_server
+from velociraptor_mcp_server.config import Config
+from velociraptor_mcp_server.server import WazuhMCPServer, create_server
 
 
 class TestWazuhMCPServer:
@@ -236,7 +236,7 @@ class TestCreateServer:
         assert isinstance(server, WazuhMCPServer)
         assert server.config == config
 
-    @patch("wazuh_mcp_server.server.Config.from_env")
+    @patch("velociraptor_mcp_server.server.Config.from_env")
     def test_create_server_without_config(self, mock_from_env, config):
         """Test create_server without config (uses env)."""
         mock_from_env.return_value = config
