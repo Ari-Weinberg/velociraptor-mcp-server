@@ -3,7 +3,7 @@ Tests for Velociraptor client.
 """
 
 import json
-from unittest.mock import AsyncMock, Mock, patch, mock_open
+from unittest.mock import AsyncMock, Mock, mock_open, patch
 
 import pytest
 

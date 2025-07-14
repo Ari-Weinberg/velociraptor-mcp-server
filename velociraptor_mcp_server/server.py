@@ -246,11 +246,13 @@ class VelociraptorMCPServer:
                     # Process results to create summaries
                     summaries = []
                     for r in results:
-                        summaries.append({
-                            "name": r["name"],
-                            "short_description": shorten(r.get("description", "")),
-                            "parameters": [p["name"] for p in r.get("parameters", [])]
-                        })
+                        summaries.append(
+                            {
+                                "name": r["name"],
+                                "short_description": shorten(r.get("description", "")),
+                                "parameters": [p["name"] for p in r.get("parameters", [])],
+                            },
+                        )
 
                     # Format the response
                     response_text = json.dumps(summaries, indent=2)
@@ -310,11 +312,13 @@ class VelociraptorMCPServer:
                     # Process results to create summaries
                     summaries = []
                     for r in results:
-                        summaries.append({
-                            "name": r["name"],
-                            "short_description": shorten(r.get("description", "")),
-                            "parameters": [p["name"] for p in r.get("parameters", [])]
-                        })
+                        summaries.append(
+                            {
+                                "name": r["name"],
+                                "short_description": shorten(r.get("description", "")),
+                                "parameters": [p["name"] for p in r.get("parameters", [])],
+                            },
+                        )
 
                     # Format the response
                     response_text = json.dumps(summaries, indent=2)
