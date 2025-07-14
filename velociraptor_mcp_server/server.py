@@ -9,7 +9,7 @@ from typing import List, Optional
 from fastmcp import FastMCP
 from pydantic import BaseModel, Field
 
-from .client import WazuhClient
+from .client import VelociraptorClient
 from .config import Config
 
 logger = logging.getLogger(__name__)
@@ -205,21 +205,21 @@ class GetSCAPolicyChecksArgs(BaseModel):
     distinct: Optional[bool] = Field(False, description="Look for distinct values")
 
 
-class WazuhMCPServer:
-    """Main MCP server for Wazuh integration."""
+class VelociraptorMCPServer:
+    """Main MCP server for Velociraptor integration."""
 
     def __init__(self, config: Config) -> None:
         self.config = config
-        self._client: Optional[WazuhClient] = None
-        self.app = FastMCP(name="Wazuh MCP Server", version="0.1.0")
+        self._client: Optional[VelociraptorClient] = None
+        self.app = FastMCP(name="Velociraptor MCP Server", version="0.1.0")
 
         # Register tools
         self._register_tools()
 
-    def _get_client(self) -> WazuhClient:
-        """Get or create Wazuh client."""
+    def _get_client(self) -> VelociraptorClient:
+        """Get or create Velociraptor client."""
         if self._client is None:
-            self._client = WazuhClient(self.config.wazuh)
+            self._client = VelociraptorClient(self.config.velociraptor)
         return self._client
 
     def _register_tools(self) -> None:
@@ -229,16 +229,17 @@ class WazuhMCPServer:
 
             @self.app.tool(
                 name="AuthenticateTool",
-                description="Force a new JWT token acquisition from Wazuh Manager. This tool requires no parameters and will refresh the authentication token for subsequent API calls.",
+                description="Initialize and test connection to Velociraptor server. This tool requires no parameters and will establish a gRPC connection for subsequent API calls using the api.config.yaml file.",
             )
             async def authenticate_tool(args: AuthenticateArgs):
-                """Force a new JWT token acquisition from Wazuh Manager.
+                """Initialize and test connection to Velociraptor server.
 
-                This tool does not require any parameters. Simply call it to refresh
-                the authentication token for subsequent Wazuh API operations.
+                This tool does not require any parameters. Simply call it to initialize
+                the gRPC connection and test authentication with the Velociraptor server
+                using the configured api.config.yaml file.
 
                 Returns:
-                    Success message with authentication details or error message.
+                    Success message with connection details or error message.
                 """
                 try:
                     client = self._get_client()
@@ -246,7 +247,7 @@ class WazuhMCPServer:
                     return [
                         {
                             "type": "text",
-                            "text": f"Authentication successful: {json.dumps(result)}",
+                            "text": f"Authentication successful: {json.dumps(result, indent=2)}",
                         },
                     ]
                 except Exception as e:
@@ -757,12 +758,12 @@ class WazuhMCPServer:
             await self._client.close()
 
 
-def create_server(config: Config = None) -> WazuhMCPServer:
-    """Factory function to create a WazuhMCPServer instance."""
+def create_server(config: Config = None) -> VelociraptorMCPServer:
+    """Factory function to create a VelociraptorMCPServer instance."""
     if config is None:
         config = Config.from_env()
 
     config.validate()
     config.setup_logging()
 
-    return WazuhMCPServer(config)
+    return VelociraptorMCPServer(config)

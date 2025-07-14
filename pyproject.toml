@@ -36,6 +36,9 @@ dependencies = [
     "PyYAML>=6.0",
     "python-dotenv>=1.0.0",
     "click>=8.0",
+    "grpcio>=1.50.0",
+    "grpcio-tools>=1.50.0",
+    "pyvelociraptor>=0.1.0",
 ]
 
 [project.optional-dependencies]

@@ -1,0 +1,27 @@
+# Velociraptor API Configuration Template
+# Copy this file and update with your actual Velociraptor server details
+# Set the path to this file in VELOCIRAPTOR_API_KEY environment variable
+
+# The gRPC endpoint for the Velociraptor server
+api_connection_string: "your-velociraptor-server:8889"
+
+# CA certificate for the Velociraptor server
+ca_certificate: |
+  -----BEGIN CERTIFICATE-----
+  # Your CA certificate content here
+  -----END CERTIFICATE-----
+
+# Client certificate for authentication
+client_cert: |
+  -----BEGIN CERTIFICATE-----
+  # Your client certificate content here
+  -----END CERTIFICATE-----
+
+# Client private key for authentication
+client_private_key: |
+  -----BEGIN RSA PRIVATE KEY-----
+  # Your client private key content here
+  -----END RSA PRIVATE KEY-----
+
+# Additional configuration options (optional)
+# See Velociraptor documentation for more details

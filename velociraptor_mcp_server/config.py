@@ -13,7 +13,7 @@ class VelociraptorConfig:
     """Configuration for a Velociraptor server instance."""
 
     url: str
-    api_key: str
+    api_key: str  # Path to api.config.yaml file or direct API key
     ssl_verify: bool = True
     timeout: int = 30
 
@@ -30,10 +30,12 @@ class VelociraptorConfig:
 
     def validate(self) -> None:
         """Validate configuration."""
-        if not self.url:
-            raise ValueError("Velociraptor server URL is required")
         if not self.api_key:
-            raise ValueError("Velociraptor API key is required")
+            raise ValueError("Velociraptor API key/config path is required")
+        # If api_key looks like a file path, validate it exists
+        if self.api_key.endswith('.yaml') or self.api_key.endswith('.yml'):
+            if not os.path.exists(self.api_key):
+                raise ValueError(f"Velociraptor API config file not found: {self.api_key}")
 
 
 @dataclass

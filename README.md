@@ -70,12 +70,11 @@ pip install velociraptor_mcp_server-*.whl
 Create a `.env` file in your project directory:
 
 ```env
-# Wazuh Manager Configuration
-WAZUH_PROD_URL=https://your-wazuh-manager:55000
-WAZUH_PROD_USERNAME=your-username
-WAZUH_PROD_PASSWORD=your-password
-WAZUH_PROD_SSL_VERIFY=false
-WAZUH_PROD_TIMEOUT=30
+# Velociraptor Server Configuration
+VELOCIRAPTOR_SERVER_URL=https://your-velociraptor-server:8889
+VELOCIRAPTOR_API_KEY=/path/to/api.config.yaml
+VELOCIRAPTOR_SSL_VERIFY=false
+VELOCIRAPTOR_TIMEOUT=30
 
 # MCP Server Configuration
 MCP_SERVER_HOST=127.0.0.1
@@ -85,10 +84,12 @@ MCP_SERVER_PORT=8000
 LOG_LEVEL=INFO
 
 # Tool Filtering (optional)
-# WAZUH_DISABLED_TOOLS=DeleteAgentTool,RestartManagerTool
-# WAZUH_DISABLED_CATEGORIES=dangerous,write
-# WAZUH_READ_ONLY=false
+# VELOCIRAPTOR_DISABLED_TOOLS=DeleteArtifactTool,RestartServerTool
+# VELOCIRAPTOR_DISABLED_CATEGORIES=dangerous,write
+# VELOCIRAPTOR_READ_ONLY=false
 ```
+
+**Note**: For `VELOCIRAPTOR_API_KEY`, provide the full path to your Velociraptor `api.config.yaml` file. You can generate this file from your Velociraptor server using the admin interface or CLI.
 
 ### 3. Run the Server
 
