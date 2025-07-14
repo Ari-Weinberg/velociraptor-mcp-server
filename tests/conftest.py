@@ -49,10 +49,10 @@ def mock_grpc_client():
 
 
 @pytest.fixture
-def velociraptor_client(velociraptor_config, mock_grpc_client):
+def velociraptor_client(velociraptor_config):
     """Create a test Velociraptor client."""
     client = VelociraptorClient(velociraptor_config)
-    client.stub = mock_grpc_client
+    # Don't set stub by default - tests can set it if needed
     return client
 
 

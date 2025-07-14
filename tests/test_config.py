@@ -44,8 +44,10 @@ class TestVelociraptorConfig:
         """Test successful validation."""
         config = VelociraptorConfig(api_key="/path/to/api.config.yaml")
 
-        # Should not raise an exception
-        config.validate()
+        # Mock file existence
+        with patch("os.path.exists", return_value=True):
+            # Should not raise an exception
+            config.validate()
 
     def test_validate_missing_api_key(self):
         """Test validation with missing API key."""
@@ -110,8 +112,10 @@ class TestConfig:
 
     def test_validate_success(self, config):
         """Test successful validation."""
-        # Should not raise an exception
-        config.validate()
+        # Mock file existence
+        with patch("os.path.exists", return_value=True):
+            # Should not raise an exception
+            config.validate()
 
     def test_validate_invalid_velociraptor_config(self, server_config):
         """Test validation with invalid Velociraptor config."""

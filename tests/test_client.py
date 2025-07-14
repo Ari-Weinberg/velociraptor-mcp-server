@@ -3,7 +3,7 @@ Tests for Velociraptor client.
 """
 
 import json
-from unittest.mock import AsyncMock, Mock, patch
+from unittest.mock import AsyncMock, Mock, mock_open, patch
 
 import pytest
 
@@ -26,8 +26,10 @@ class TestVelociraptorClient:
         # Mock the authentication process
         mock_query_response = Mock()
         mock_query_response.Response = json.dumps([{"user": "test_user", "permissions": ["READ"]}])
+        mock_query_response.error = None  # No error
 
-        mock_grpc_client.Query.return_value = mock_query_response
+        # Make the Query return an iterable
+        mock_grpc_client.Query.return_value = [mock_query_response]
 
         with patch("grpc.ssl_channel_credentials"), patch("grpc.secure_channel"), patch(
             "velociraptor_mcp_server.client.api_pb2_grpc.APIStub",
@@ -42,12 +44,18 @@ class TestVelociraptorClient:
             },
         ), patch(
             "builtins.open",
-            Mock(),
+            mock_open(),
+        ), patch(
+            "os.path.exists",
+            return_value=True,
         ):
             result = await velociraptor_client.authenticate()
 
-            assert "user" in result[0]
-            assert result[0]["user"] == "test_user"
+            assert result["status"] == "authenticated"
+            assert result["connection_type"] == "gRPC"
+            assert "test_query_result" in result
+            assert len(result["test_query_result"]) == 1
+            assert result["test_query_result"][0]["user"] == "test_user"
             assert velociraptor_client.stub is not None
 
     @pytest.mark.asyncio
@@ -70,8 +78,9 @@ class TestVelociraptorClient:
                 {"client_id": "C.0987654321", "hostname": "test-host-2"},
             ],
         )
+        mock_query_response.error = None  # No error
 
-        mock_grpc_client.Query.return_value = mock_query_response
+        mock_grpc_client.Query.return_value = [mock_query_response]
 
         result = velociraptor_client.run_vql_query("SELECT * FROM clients() LIMIT 10")
 
@@ -109,8 +118,9 @@ class TestVelociraptorClient:
                 },
             ],
         )
+        mock_query_response.error = None  # No error
 
-        mock_grpc_client.Query.return_value = mock_query_response
+        mock_grpc_client.Query.return_value = [mock_query_response]
 
         result = velociraptor_client.find_client_info("test-host")
 
@@ -127,8 +137,9 @@ class TestVelociraptorClient:
         # Mock empty VQL query response
         mock_query_response = Mock()
         mock_query_response.Response = json.dumps([])
+        mock_query_response.error = None  # No error
 
-        mock_grpc_client.Query.return_value = mock_query_response
+        mock_grpc_client.Query.return_value = [mock_query_response]
 
         result = velociraptor_client.find_client_info("nonexistent-host")
 
@@ -144,8 +155,9 @@ class TestVelociraptorClient:
         mock_query_response.Response = json.dumps(
             [{"flow_id": "F.1234567890", "status": "RUNNING"}],
         )
+        mock_query_response.error = None  # No error
 
-        mock_grpc_client.Query.return_value = mock_query_response
+        mock_grpc_client.Query.return_value = [mock_query_response]
 
         result = velociraptor_client.start_collection("C.1234567890", "Windows.System.Users")
 

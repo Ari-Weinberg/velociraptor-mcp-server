@@ -36,6 +36,18 @@ class RunVQLQueryArgs(BaseModel):
     timeout: Optional[int] = Field(None, description="Query timeout in seconds")
 
 
+class ListLinuxArtifactsArgs(BaseModel):
+    """Arguments for listing Linux artifacts (no parameters needed)."""
+
+    pass
+
+
+class ListWindowsArtifactsArgs(BaseModel):
+    """Arguments for listing Windows artifacts (no parameters needed)."""
+
+    pass
+
+
 class VelociraptorMCPServer:
     """Main MCP server for Velociraptor integration."""
 
@@ -192,6 +204,134 @@ class VelociraptorMCPServer:
                 except Exception as e:
                     logger.error("Failed to execute VQL query: %s", e)
                     return [{"type": "text", "text": f"Error executing VQL query: {str(e)}"}]
+
+        if "ListLinuxArtifactsTool" not in self.config.server.disabled_tools:
+
+            @self.app.tool(
+                name="ListLinuxArtifactsTool",
+                description="List available Linux artifacts in Velociraptor. This tool returns a summary of all Linux client artifacts including their names, descriptions, and required parameters.",
+            )
+            async def list_linux_artifacts_tool(args: ListLinuxArtifactsArgs):
+                """List available Linux artifacts with their descriptions and parameters.
+
+                This tool queries the Velociraptor server for all available Linux client artifacts
+                and returns a structured summary including artifact names, short descriptions,
+                and parameter requirements.
+
+                Returns:
+                    JSON array of Linux artifacts with name, short_description, and parameters.
+                """
+                try:
+                    client = self._get_client()
+
+                    # Ensure client is authenticated
+                    if client.stub is None:
+                        await client.authenticate()
+
+                    # VQL query to get Linux artifacts
+                    vql = """
+                    LET params(data) = SELECT name FROM data
+                    SELECT name, description, params(data=parameters) AS parameters
+                    FROM artifact_definitions()
+                    WHERE type =~ 'client' AND name =~ 'linux\\.'
+                    """
+
+                    # Helper function to shorten descriptions
+                    def shorten(desc: str) -> str:
+                        return desc.strip().split(".")[0][:120].rstrip() + "..." if desc else ""
+
+                    # Execute the VQL query
+                    results = client.run_vql_query(vql)
+
+                    # Process results to create summaries
+                    summaries = []
+                    for r in results:
+                        summaries.append(
+                            {
+                                "name": r["name"],
+                                "short_description": shorten(r.get("description", "")),
+                                "parameters": [p["name"] for p in r.get("parameters", [])],
+                            },
+                        )
+
+                    # Format the response
+                    response_text = json.dumps(summaries, indent=2)
+
+                    return [
+                        {
+                            "type": "text",
+                            "text": self._safe_truncate(response_text),
+                        },
+                    ]
+                except Exception as e:
+                    logger.error("Failed to list Linux artifacts: %s", e)
+                    return [{"type": "text", "text": f"Error listing Linux artifacts: {str(e)}"}]
+
+        if "ListWindowsArtifactsTool" not in self.config.server.disabled_tools:
+
+            @self.app.tool(
+                name="ListWindowsArtifactsTool",
+                description="List available Windows artifacts in Velociraptor. This tool returns a summary of all Windows client artifacts including their names, descriptions, and required parameters. Generally parameters that target filename regexs are more performant in NTFS queries: MFT, USN and can also be used to target top level folders. A Path glob is performant, and path regex is useful to specifically filter locations.",
+            )
+            async def list_windows_artifacts_tool(args: ListWindowsArtifactsArgs):
+                """List available Windows artifacts with their descriptions and parameters.
+
+                This tool queries the Velociraptor server for all available Windows client artifacts
+                and returns a structured summary including artifact names, short descriptions,
+                and parameter requirements.
+
+                Generally parameters that target filename regexs are more performant in NTFS queries:
+                MFT, USN and can also be used to target top level folders. A Path glob is performant,
+                and path regex is useful to specifically filter locations.
+
+                Returns:
+                    JSON array of Windows artifacts with name, short_description, and parameters.
+                """
+                try:
+                    client = self._get_client()
+
+                    # Ensure client is authenticated
+                    if client.stub is None:
+                        await client.authenticate()
+
+                    # VQL query to get Windows artifacts
+                    vql = """
+                    LET params(data) = SELECT name FROM data
+                    SELECT name, description, params(data=parameters) AS parameters
+                    FROM artifact_definitions()
+                    WHERE type =~ 'client' AND name =~ '^windows\\.'
+                    """
+
+                    # Helper function to shorten descriptions
+                    def shorten(desc: str) -> str:
+                        return desc.strip().split(".")[0][:120].rstrip() + "..." if desc else ""
+
+                    # Execute the VQL query
+                    results = client.run_vql_query(vql)
+
+                    # Process results to create summaries
+                    summaries = []
+                    for r in results:
+                        summaries.append(
+                            {
+                                "name": r["name"],
+                                "short_description": shorten(r.get("description", "")),
+                                "parameters": [p["name"] for p in r.get("parameters", [])],
+                            },
+                        )
+
+                    # Format the response
+                    response_text = json.dumps(summaries, indent=2)
+
+                    return [
+                        {
+                            "type": "text",
+                            "text": self._safe_truncate(response_text),
+                        },
+                    ]
+                except Exception as e:
+                    logger.error("Failed to list Windows artifacts: %s", e)
+                    return [{"type": "text", "text": f"Error listing Windows artifacts: {str(e)}"}]
 
     def _safe_truncate(self, text: str, max_length: int = 32000) -> str:
         """Truncate text to avoid overwhelming the client."""
