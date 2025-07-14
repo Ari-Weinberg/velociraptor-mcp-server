@@ -39,7 +39,10 @@ def create_parser() -> argparse.ArgumentParser:
         default="INFO",
         help="Logging level (default: INFO)",
     )
-    parser.add_argument("--api-config", help="Path to Velociraptor api.config.yaml file (overrides VELOCIRAPTOR_API_KEY env var)")
+    parser.add_argument(
+        "--api-config",
+        help="Path to Velociraptor api.config.yaml file (overrides VELOCIRAPTOR_API_KEY env var)",
+    )
     parser.add_argument(
         "--no-ssl-verify",
         action="store_true",

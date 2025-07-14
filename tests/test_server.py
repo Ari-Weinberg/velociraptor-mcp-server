@@ -148,15 +148,18 @@ class TestVelociraptorMCPServer:
 
         # Mock the client
         mock_client = Mock()
-        mock_client.authenticate = AsyncMock(return_value={"status": "authenticated", "user": "test_user"})
+        mock_client.authenticate = AsyncMock(
+            return_value={"status": "authenticated", "user": "test_user"},
+        )
         server._client = mock_client
 
         # Get the tool and execute it
         tools = await server.app.get_tools()
         authenticate_tool = tools["AuthenticateTool"]
-        
+
         # Mock arguments
         from velociraptor_mcp_server.server import AuthenticateArgs
+
         args = AuthenticateArgs()
 
         # Execute the tool
@@ -177,19 +180,22 @@ class TestVelociraptorMCPServer:
         mock_client = Mock()
         mock_client.stub = Mock()  # Simulate authenticated client
         mock_client.authenticate = AsyncMock()
-        mock_client.find_client_info = Mock(return_value={
-            "client_id": "C.1234567890",
-            "hostname": "test-host",
-            "os_info": {"system": "Linux", "release": "Ubuntu 20.04"}
-        })
+        mock_client.find_client_info = Mock(
+            return_value={
+                "client_id": "C.1234567890",
+                "hostname": "test-host",
+                "os_info": {"system": "Linux", "release": "Ubuntu 20.04"},
+            },
+        )
         server._client = mock_client
 
         # Get the tool and execute it
         tools = await server.app.get_tools()
         get_agent_info_tool = tools["GetAgentInfo"]
-        
+
         # Mock arguments
         from velociraptor_mcp_server.server import GetAgentInfoArgs
+
         args = GetAgentInfoArgs(hostname="test-host")
 
         # Execute the tool
@@ -217,9 +223,10 @@ class TestVelociraptorMCPServer:
         # Get the tool and execute it
         tools = await server.app.get_tools()
         get_agent_info_tool = tools["GetAgentInfo"]
-        
+
         # Mock arguments
         from velociraptor_mcp_server.server import GetAgentInfoArgs
+
         args = GetAgentInfoArgs(hostname="nonexistent-host")
 
         # Execute the tool
@@ -240,18 +247,21 @@ class TestVelociraptorMCPServer:
         mock_client = Mock()
         mock_client.stub = Mock()  # Simulate authenticated client
         mock_client.authenticate = AsyncMock()
-        mock_client.run_vql_query = Mock(return_value=[
-            {"client_id": "C.1234567890", "hostname": "test-host"},
-            {"client_id": "C.0987654321", "hostname": "test-host-2"}
-        ])
+        mock_client.run_vql_query = Mock(
+            return_value=[
+                {"client_id": "C.1234567890", "hostname": "test-host"},
+                {"client_id": "C.0987654321", "hostname": "test-host-2"},
+            ],
+        )
         server._client = mock_client
 
         # Get the tool and execute it
         tools = await server.app.get_tools()
         run_vql_query_tool = tools["RunVQLQueryTool"]
-        
+
         # Mock arguments
         from velociraptor_mcp_server.server import RunVQLQueryArgs
+
         args = RunVQLQueryArgs(vql="SELECT * FROM clients() LIMIT 10")
 
         # Execute the tool

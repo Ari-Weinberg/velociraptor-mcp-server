@@ -5,10 +5,10 @@ Velociraptor client for API communication.
 import json
 import logging
 import os
-import yaml
 from typing import Any, Dict, List, Optional
 
 import grpc
+import yaml
 from pyvelociraptor import api_pb2, api_pb2_grpc
 
 from .config import VelociraptorConfig
@@ -43,36 +43,43 @@ class VelociraptorClient:
         try:
             # For Velociraptor, we need to use a config file or API key
             # If config.api_key is a path to a config file, load it
-            if self.config.api_key.endswith('.yaml') or self.config.api_key.endswith('.yml'):
+            if self.config.api_key.endswith(".yaml") or self.config.api_key.endswith(".yml"):
                 config_path = self.config.api_key
                 if not os.path.exists(config_path):
                     raise VelociraptorAuthenticationError(f"Config file not found: {config_path}")
 
                 # Load the API config file
-                with open(config_path, 'r') as f:
+                with open(config_path, "r") as f:
                     api_config = yaml.safe_load(f)
 
                 # Validate required fields
-                required_fields = ["ca_certificate", "client_private_key", "client_cert", "api_connection_string"]
+                required_fields = [
+                    "ca_certificate",
+                    "client_private_key",
+                    "client_cert",
+                    "api_connection_string",
+                ]
                 for field in required_fields:
                     if field not in api_config:
-                        raise VelociraptorAuthenticationError(f"Missing required field in config: {field}")
+                        raise VelociraptorAuthenticationError(
+                            f"Missing required field in config: {field}",
+                        )
 
                 # Create SSL credentials
                 creds = grpc.ssl_channel_credentials(
                     root_certificates=api_config["ca_certificate"].encode("utf-8"),
                     private_key=api_config["client_private_key"].encode("utf-8"),
-                    certificate_chain=api_config["client_cert"].encode("utf-8")
+                    certificate_chain=api_config["client_cert"].encode("utf-8"),
                 )
 
                 # Channel options
-                channel_opts = (('grpc.ssl_target_name_override', "VelociraptorServer"),)
+                channel_opts = (("grpc.ssl_target_name_override", "VelociraptorServer"),)
 
                 # Create secure channel
                 self._channel = grpc.secure_channel(
                     api_config["api_connection_string"],
                     creds,
-                    options=channel_opts
+                    options=channel_opts,
                 )
 
                 # Create stub
@@ -80,7 +87,7 @@ class VelociraptorClient:
 
                 # Test the connection with a simple query
                 test_request = api_pb2.VQLCollectorArgs(
-                    Query=[api_pb2.VQLRequest(VQL="SELECT * FROM info()")]
+                    Query=[api_pb2.VQLRequest(VQL="SELECT * FROM info()")],
                 )
 
                 # Try to execute a test query
@@ -96,7 +103,7 @@ class VelociraptorClient:
                     "connection_type": "gRPC",
                     "server_url": api_config["api_connection_string"],
                     "test_query_result": results,
-                    "message": "Successfully connected to Velociraptor server"
+                    "message": "Successfully connected to Velociraptor server",
                 }
 
             else:
@@ -105,7 +112,7 @@ class VelociraptorClient:
                 # For now, we'll raise an error suggesting to use config file
                 raise VelociraptorAuthenticationError(
                     "Direct API key authentication not yet implemented. "
-                    "Please provide a path to an api.config.yaml file in the VELOCIRAPTOR_API_KEY environment variable."
+                    "Please provide a path to an api.config.yaml file in the VELOCIRAPTOR_API_KEY environment variable.",
                 )
 
         except grpc.RpcError as e:
@@ -188,7 +195,12 @@ class VelociraptorClient:
             return None
         return result[0]
 
-    def start_collection(self, client_id: str, artifact: str, parameters: str = "") -> List[Dict[str, Any]]:
+    def start_collection(
+        self,
+        client_id: str,
+        artifact: str,
+        parameters: str = "",
+    ) -> List[Dict[str, Any]]:
         """Start a collection on a client.
 
         Args:
@@ -228,7 +240,13 @@ class VelociraptorClient:
             return "FINISHED"
         return "RUNNING"
 
-    def get_flow_results(self, client_id: str, flow_id: str, artifact: str, fields: str = "*") -> List[Dict[str, Any]]:
+    def get_flow_results(
+        self,
+        client_id: str,
+        flow_id: str,
+        artifact: str,
+        fields: str = "*",
+    ) -> List[Dict[str, Any]]:
         """Get results from a completed flow.
 
         Args:
@@ -243,7 +261,14 @@ class VelociraptorClient:
         vql = f"SELECT {fields} FROM source(client_id='{client_id}', flow_id='{flow_id}',artifact='{artifact}')"
         return self.run_vql_query(vql)
 
-    def realtime_collection(self, client_id: str, artifact: str, parameters: str = "", fields: str = "*", result_scope: str = "") -> List[Dict[str, Any]]:
+    def realtime_collection(
+        self,
+        client_id: str,
+        artifact: str,
+        parameters: str = "",
+        fields: str = "*",
+        result_scope: str = "",
+    ) -> List[Dict[str, Any]]:
         """Perform a realtime collection and wait for results.
 
         Args:
