@@ -1,5 +1,5 @@
 """
-Configuration management for Wazuh MCP Server.
+Configuration management for Velociraptor MCP Server.
 """
 
 import logging
@@ -9,22 +9,20 @@ from typing import List
 
 
 @dataclass
-class WazuhConfig:
-    """Configuration for a Wazuh Manager instance."""
+class VelociraptorConfig:
+    """Configuration for a Velociraptor server instance."""
 
     url: str
-    username: str
-    password: str
+    api_key: str
     ssl_verify: bool = True
     timeout: int = 30
 
     @classmethod
-    def from_env(cls, prefix: str = "WAZUH_PROD") -> "WazuhConfig":
+    def from_env(cls, prefix: str = "VELOCIRAPTOR") -> "VelociraptorConfig":
         """Create configuration from environment variables."""
         return cls(
-            url=os.getenv(f"{prefix}_URL", ""),
-            username=os.getenv(f"{prefix}_USERNAME", ""),
-            password=os.getenv(f"{prefix}_PASSWORD", ""),
+            url=os.getenv(f"{prefix}_SERVER_URL", ""),
+            api_key=os.getenv(f"{prefix}_API_KEY", ""),
             ssl_verify=os.getenv(f"{prefix}_SSL_VERIFY", "true").lower()
             not in {"0", "false", "no"},
             timeout=int(os.getenv(f"{prefix}_TIMEOUT", "30")),
@@ -33,11 +31,9 @@ class WazuhConfig:
     def validate(self) -> None:
         """Validate configuration."""
         if not self.url:
-            raise ValueError("Wazuh URL is required")
-        if not self.username:
-            raise ValueError("Wazuh username is required")
-        if not self.password:
-            raise ValueError("Wazuh password is required")
+            raise ValueError("Velociraptor server URL is required")
+        if not self.api_key:
+            raise ValueError("Velociraptor API key is required")
 
 
 @dataclass
@@ -55,11 +51,11 @@ class ServerConfig:
     def from_env(cls) -> "ServerConfig":
         """Create configuration from environment variables."""
         disabled_tools = []
-        if tools_str := os.getenv("WAZUH_DISABLED_TOOLS"):
+        if tools_str := os.getenv("VELOCIRAPTOR_DISABLED_TOOLS"):
             disabled_tools = [tool.strip() for tool in tools_str.split(",")]
 
         disabled_categories = []
-        if categories_str := os.getenv("WAZUH_DISABLED_CATEGORIES"):
+        if categories_str := os.getenv("VELOCIRAPTOR_DISABLED_CATEGORIES"):
             disabled_categories = [cat.strip() for cat in categories_str.split(",")]
 
         return cls(
@@ -68,7 +64,7 @@ class ServerConfig:
             log_level=os.getenv("LOG_LEVEL", "INFO"),
             disabled_tools=disabled_tools,
             disabled_categories=disabled_categories,
-            read_only=os.getenv("WAZUH_READ_ONLY", "false").lower() in {"1", "true", "yes"},
+            read_only=os.getenv("VELOCIRAPTOR_READ_ONLY", "false").lower() in {"1", "true", "yes"},
         )
 
 
@@ -76,17 +72,17 @@ class ServerConfig:
 class Config:
     """Main configuration class."""
 
-    wazuh: WazuhConfig
+    velociraptor: VelociraptorConfig
     server: ServerConfig
 
     @classmethod
     def from_env(cls) -> "Config":
         """Create configuration from environment variables."""
-        return cls(wazuh=WazuhConfig.from_env(), server=ServerConfig.from_env())
+        return cls(velociraptor=VelociraptorConfig.from_env(), server=ServerConfig.from_env())
 
     def validate(self) -> None:
         """Validate all configuration."""
-        self.wazuh.validate()
+        self.velociraptor.validate()
 
     def setup_logging(self) -> None:
         """Setup logging configuration."""

@@ -7,7 +7,7 @@ from unittest.mock import patch
 
 import pytest
 
-from wazuh_mcp_server.config import Config, ServerConfig, WazuhConfig
+from velociraptor_mcp_server.config import Config, ServerConfig, WazuhConfig
 
 
 class TestWazuhConfig:

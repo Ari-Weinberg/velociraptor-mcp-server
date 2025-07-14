@@ -7,8 +7,8 @@ from unittest.mock import AsyncMock, Mock
 
 import pytest
 
-from wazuh_mcp_server.client import WazuhClient
-from wazuh_mcp_server.config import Config, ServerConfig, WazuhConfig
+from velociraptor_mcp_server.client import WazuhClient
+from velociraptor_mcp_server.config import Config, ServerConfig, WazuhConfig
 
 
 @pytest.fixture

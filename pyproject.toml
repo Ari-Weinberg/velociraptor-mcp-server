@@ -3,16 +3,16 @@ requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "wazuh-mcp-server"
+name = "velociraptor-mcp-server"
 version = "0.1.0"
-description = "Model Context Protocol server for Wazuh Manager integration"
+description = "Model Context Protocol server for Velociraptor DFIR integration"
 readme = "README.md"
 requires-python = ">=3.8"
 license = "MIT"
 authors = [
     {name = "SOCFortress", email = "info@socfortress.co"},
 ]
-keywords = ["wazuh", "mcp", "llm", "security", "siem"]
+keywords = ["velociraptor", "mcp", "llm", "dfir", "forensics", "incident-response"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
@@ -51,20 +51,20 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/socfortress/wazuh-mcp-server"
-Repository = "https://github.com/socfortress/wazuh-mcp-server"
-Documentation = "https://github.com/socfortress/wazuh-mcp-server#readme"
-Issues = "https://github.com/socfortress/wazuh-mcp-server/issues"
+Homepage = "https://github.com/socfortress/velociraptor-mcp-server"
+Repository = "https://github.com/socfortress/velociraptor-mcp-server"
+Documentation = "https://github.com/socfortress/velociraptor-mcp-server#readme"
+Issues = "https://github.com/socfortress/velociraptor-mcp-server/issues"
 
 [project.scripts]
-wazuh-mcp-server = "wazuh_mcp_server.__main__:main"
+velociraptor-mcp-server = "velociraptor_mcp_server.__main__:main"
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["wazuh_mcp_server*"]
+include = ["velociraptor_mcp_server*"]
 
 [tool.setuptools.package-data]
-wazuh_mcp_server = ["py.typed"]
+velociraptor_mcp_server = ["py.typed"]
 
 [tool.black]
 line-length = 100
@@ -124,7 +124,7 @@ markers = [
 ]
 
 [tool.coverage.run]
-source = ["wazuh_mcp_server"]
+source = ["velociraptor_mcp_server"]
 omit = [
     "*/tests/*",
     "*/test_*",

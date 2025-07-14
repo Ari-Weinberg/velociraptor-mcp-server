@@ -1,9 +1,9 @@
 #!/bin/bash
-# Build script for wazuh-mcp-server
+# Build script for velociraptor-mcp-server
 
 set -e
 
-echo "🚀 Building wazuh-mcp-server package..."
+echo "🚀 Building velociraptor-mcp-server package..."
 
 # Clean previous builds
 echo "🧹 Cleaning previous builds..."
@@ -31,6 +31,6 @@ ls -la dist/
 echo "✅ Package built successfully!"
 echo ""
 echo "📋 Next steps:"
-echo "1. Test the package: pip install dist/wazuh_mcp_server-*.whl"
+echo "1. Test the package: pip install dist/velociraptor_mcp_server-*.whl"
 echo "2. Create a GitHub release with the built artifacts"
-echo "3. Install from GitHub: pip install git+https://github.com/yourusername/wazuh-mcp-server.git"
+echo "3. Install from GitHub: pip install git+https://github.com/yourusername/velociraptor-mcp-server.git"

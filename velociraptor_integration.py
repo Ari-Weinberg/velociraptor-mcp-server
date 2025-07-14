@@ -17,7 +17,7 @@ async def main():
     # Connect to Wazuh MCP server and create agent
     client = MultiServerMCPClient(
         {
-            "wazuh-mcp-server": {
+            "velociraptor-mcp-server": {
                 "transport": "sse",
                 "url": "http://127.0.0.1:8000/sse/",  # Your Wazuh MCP server SSE endpoint
                 "headers": {

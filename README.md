@@ -1,14 +1,14 @@
-# Wazuh MCP Server
+# Velociraptor MCP Server
 
-A production-ready **Model Context Protocol (MCP) server** for seamless integration between Wazuh SIEM and Large Language Models (LLMs).
+A production-ready **Model Context Protocol (MCP) server** for seamless integration between Velociraptor DFIR and Large Language Models (LLMs).
 
-[![Build Status](https://github.com/socfortress/wazuh-mcp-server/actions/workflows/publish.yml/badge.svg)](https://github.com/socfortress/wazuh-mcp-server/actions)
+[![Build Status](https://github.com/socfortress/velociraptor-mcp-server/actions/workflows/publish.yml/badge.svg)](https://github.com/socfortress/velociraptor-mcp-server/actions)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![YouTube Channel Subscribers](https://img.shields.io/youtube/channel/subscribers/UC4EUQtTxeC8wGrKRafI6pZg)](https://www.youtube.com/@taylorwalton_socfortress/videos)
 [![Get in Touch](https://img.shields.io/badge/📧%20Get%20in%20Touch-Friendly%20Support%20Awaits!-blue?style=for-the-badge)](https://www.socfortress.co/contact_form.html)
 
 > **Why?**
-> Combine the power of Wazuh's comprehensive security monitoring with the reasoning capabilities of large language models—enabling natural language queries and intelligent analysis of your security data.
+> Combine the power of Velociraptor's comprehensive digital forensics and incident response capabilities with the reasoning capabilities of large language models—enabling natural language queries and intelligent analysis of your forensic data.
 
 ---
 
@@ -17,7 +17,7 @@ A production-ready **Model Context Protocol (MCP) server** for seamless integrat
 - 🚀 **Production-ready**: Proper package structure, logging, error handling, and configuration management
 - 🔐 **Secure**: JWT token management with automatic refresh
 - 🌐 **HTTP/2 Support**: Built on modern async HTTP client with connection pooling
-- 📊 **Comprehensive API**: Access Wazuh agents, authentication, and more
+- 📊 **Comprehensive API**: Access Velociraptor artifacts, hunts, collections, and more
 - 🎛️ **Configurable**: Environment variables, CLI arguments, and fine-grained tool filtering
 - 📦 **Pip installable**: Install directly from GitHub releases or source
 
@@ -45,24 +45,24 @@ A production-ready **Model Context Protocol (MCP) server** for seamless integrat
 #### From GitHub (Recommended)
 ```bash
 python -m venv .venv && source .venv/bin/activate
-pip install git+https://github.com/socfortress/wazuh-mcp-server.git
+pip install git+https://github.com/socfortress/velociraptor-mcp-server.git
 ```
 
 #### From Release Artifacts
-1. Go to the [Releases page](https://github.com/socfortress/wazuh-mcp-server/releases)
+1. Go to the [Releases page](https://github.com/socfortress/velociraptor-mcp-server/releases)
 2. Download the latest `.whl` file
 3. Install with:
 ```bash
-pip install wazuh_mcp_server-*.whl
+pip install velociraptor_mcp_server-*.whl
 ```
 
 #### From Build Artifacts (Latest Build)
-1. Go to the [Actions tab](https://github.com/socfortress/wazuh-mcp-server/actions)
+1. Go to the [Actions tab](https://github.com/socfortress/velociraptor-mcp-server/actions)
 2. Click on the latest successful workflow run
 3. Download the `python-package-distributions` artifact
 4. Extract and install:
 ```bash
-pip install wazuh_mcp_server-*.whl
+pip install velociraptor_mcp_server-*.whl
 ```
 
 ### 2. Configure Environment
@@ -94,13 +94,13 @@ LOG_LEVEL=INFO
 
 ```bash
 # Using the CLI command
-wazuh-mcp-server
+velociraptor-mcp-server
 
 # Or using the Python module
-python -m wazuh_mcp_server
+python -m velociraptor_mcp_server
 
 # With custom configuration
-wazuh-mcp-server --host 0.0.0.0 --port 8080 --log-level DEBUG
+velociraptor-mcp-server --host 0.0.0.0 --port 8080 --log-level DEBUG
 ```
 
 The server will start and be available at `http://127.0.0.1:8000` (or your configured host/port).
@@ -118,8 +118,8 @@ The server will start and be available at `http://127.0.0.1:8000` (or your confi
 ### Development Installation
 
 ```bash
-git clone https://github.com/socfortress/wazuh-mcp-server.git
-cd wazuh-mcp-server
+git clone https://github.com/socfortress/velociraptor-mcp-server.git
+cd velociraptor-mcp-server
 
 # Create virtual environment
 python -m venv .venv
@@ -155,7 +155,7 @@ pre-commit install
 ### CLI Options
 
 ```bash
-wazuh-mcp-server --help
+velociraptor-mcp-server --help
 ```
 
 Available options:
@@ -174,7 +174,7 @@ Available options:
 ### Basic Usage
 
 ```python
-from wazuh_mcp_server import Config, create_server
+from velociraptor_mcp_server import Config, create_server
 
 # Create server with environment configuration
 config = Config.from_env()
@@ -187,7 +187,7 @@ server.start()
 ### Custom Configuration
 
 ```python
-from wazuh_mcp_server.config import WazuhConfig, ServerConfig, Config
+from velociraptor_mcp_server.config import WazuhConfig, ServerConfig, Config
 
 # Create custom configuration
 wazuh_config = WazuhConfig(
@@ -219,7 +219,7 @@ model = ChatOpenAI(model="gpt-4")
 
 # Connect to Wazuh MCP server
 client = MultiServerMCPClient({
-    "wazuh-mcp-server": {
+    "velociraptor-mcp-server": {
         "transport": "sse",
         "url": "http://127.0.0.1:8000/sse/",
     }
@@ -380,8 +380,8 @@ The server exposes the following MCP tools:
 ### Setting up Development Environment
 
 ```bash
-git clone https://github.com/socfortress/wazuh-mcp-server.git
-cd wazuh-mcp-server
+git clone https://github.com/socfortress/velociraptor-mcp-server.git
+cd velociraptor-mcp-server
 
 # Create virtual environment
 python -m venv .venv
@@ -401,7 +401,7 @@ pre-commit install
 pytest
 
 # Run with coverage
-pytest --cov=wazuh_mcp_server
+pytest --cov=velociraptor_mcp_server
 
 # Run specific test file
 pytest tests/test_client.py
@@ -451,7 +451,7 @@ This project uses GitHub Actions for automated building and testing:
 
 ### Installing from CI Artifacts
 
-Visit the [Actions page](https://github.com/socfortress/wazuh-mcp-server/actions) and download the `python-package-distributions` artifact from any successful build.
+Visit the [Actions page](https://github.com/socfortress/velociraptor-mcp-server/actions) and download the `python-package-distributions` artifact from any successful build.
 
 ---
 
@@ -482,8 +482,8 @@ Visit the [Actions page](https://github.com/socfortress/wazuh-mcp-server/actions
 ## Project Structure
 
 ```
-wazuh-mcp-server/
-├── wazuh_mcp_server/          # Main package
+velociraptor-mcp-server/
+├── velociraptor_mcp_server/          # Main package
 │   ├── __init__.py           # Package initialization
 │   ├── __main__.py           # CLI entry point
 │   ├── client.py             # Wazuh API client
@@ -549,8 +549,8 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## Support
 
-- 📖 [Documentation](https://github.com/socfortress/wazuh-mcp-server#readme)
-- 🐛 [Issues](https://github.com/socfortress/wazuh-mcp-server/issues)
+- 📖 [Documentation](https://github.com/socfortress/velociraptor-mcp-server#readme)
+- 🐛 [Issues](https://github.com/socfortress/velociraptor-mcp-server/issues)
 - 🏢 [SOCFortress](https://socfortress.co)
 
 ---
