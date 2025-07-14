@@ -7,17 +7,15 @@ from unittest.mock import AsyncMock, Mock
 
 import pytest
 
-from velociraptor_mcp_server.client import WazuhClient
-from velociraptor_mcp_server.config import Config, ServerConfig, WazuhConfig
+from velociraptor_mcp_server.client import VelociraptorClient
+from velociraptor_mcp_server.config import Config, ServerConfig, VelociraptorConfig
 
 
 @pytest.fixture
-def wazuh_config():
-    """Create a test Wazuh configuration."""
-    return WazuhConfig(
-        url="https://test-wazuh:55000",
-        username="test-user",
-        password="test-password",
+def velociraptor_config():
+    """Create a test Velociraptor configuration."""
+    return VelociraptorConfig(
+        api_key="/path/to/test/api.config.yaml",
         ssl_verify=False,
         timeout=10,
     )
@@ -37,26 +35,24 @@ def server_config():
 
 
 @pytest.fixture
-def config(wazuh_config, server_config):
+def config(velociraptor_config, server_config):
     """Create a test configuration."""
-    return Config(wazuh=wazuh_config, server=server_config)
+    return Config(velociraptor=velociraptor_config, server=server_config)
 
 
 @pytest.fixture
-def mock_httpx_client():
-    """Create a mock httpx client."""
+def mock_grpc_client():
+    """Create a mock gRPC client."""
     client = Mock()
-    client.post = AsyncMock()
-    client.request = AsyncMock()
-    client.aclose = AsyncMock()
+    client.Query = Mock()
     return client
 
 
 @pytest.fixture
-def wazuh_client(wazuh_config, mock_httpx_client):
-    """Create a test Wazuh client."""
-    client = WazuhClient(wazuh_config)
-    client._client = mock_httpx_client
+def velociraptor_client(velociraptor_config, mock_grpc_client):
+    """Create a test Velociraptor client."""
+    client = VelociraptorClient(velociraptor_config)
+    client.stub = mock_grpc_client
     return client
 
 

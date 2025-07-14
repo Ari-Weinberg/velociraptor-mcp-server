@@ -12,7 +12,6 @@ from typing import List
 class VelociraptorConfig:
     """Configuration for a Velociraptor server instance."""
 
-    url: str
     api_key: str  # Path to api.config.yaml file or direct API key
     ssl_verify: bool = True
     timeout: int = 30
@@ -21,7 +20,6 @@ class VelociraptorConfig:
     def from_env(cls, prefix: str = "VELOCIRAPTOR") -> "VelociraptorConfig":
         """Create configuration from environment variables."""
         return cls(
-            url=os.getenv(f"{prefix}_SERVER_URL", ""),
             api_key=os.getenv(f"{prefix}_API_KEY", ""),
             ssl_verify=os.getenv(f"{prefix}_SSL_VERIFY", "true").lower()
             not in {"0", "false", "no"},

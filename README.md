@@ -71,7 +71,6 @@ Create a `.env` file in your project directory:
 
 ```env
 # Velociraptor Server Configuration
-VELOCIRAPTOR_SERVER_URL=https://your-velociraptor-server:8889
 VELOCIRAPTOR_API_KEY=/path/to/api.config.yaml
 VELOCIRAPTOR_SSL_VERIFY=false
 VELOCIRAPTOR_TIMEOUT=30

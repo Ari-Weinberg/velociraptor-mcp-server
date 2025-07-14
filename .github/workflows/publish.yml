@@ -114,7 +114,6 @@ jobs:
         velociraptor-mcp-server --version
 
         # Test with example env vars (should fail gracefully)
-        export VELOCIRAPTOR_SERVER_URL=""
         export VELOCIRAPTOR_API_KEY=""
         python -c "from velociraptor_mcp_server import Config; print('✅ Config module works')"
 
