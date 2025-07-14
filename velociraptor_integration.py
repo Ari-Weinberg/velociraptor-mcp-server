@@ -39,14 +39,10 @@ async def main():
         verbose=True,  # Enables detailed output of the agent's thought process
     )
 
-    # Example queries for Wazuh
-    print("\n=== Testing Authentication ===")
-    await agent.ainvoke({"input": "Authenticate with Wazuh to get a new JWT token"})
-
     print("\n=== Testing Get Agents ===")
     await agent.ainvoke(
         {
-            "input": "Show me all agents and their IP addresses.",
+            "input": "Give me the client details for the piHole client.",
         },
     )
 

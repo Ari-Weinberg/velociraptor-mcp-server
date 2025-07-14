@@ -80,7 +80,7 @@ class VelociraptorClient:
 
                 # Test the connection with a simple query
                 test_request = api_pb2.VQLCollectorArgs(
-                    Query=[api_pb2.VQLRequest(VQL="SELECT 'connection_test' as status")]
+                    Query=[api_pb2.VQLRequest(VQL="SELECT * FROM info()")]
                 )
 
                 # Try to execute a test query

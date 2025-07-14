@@ -1,5 +1,5 @@
 """
-Main CLI entry point for the Wazuh MCP Server.
+Main CLI entry point for the Velociraptor MCP Server.
 """
 
 import argparse
@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 def create_parser() -> argparse.ArgumentParser:
     """Create argument parser for CLI."""
     parser = argparse.ArgumentParser(
-        description="Wazuh MCP Server - Model Context Protocol server for Wazuh Manager",
+        description="Velociraptor MCP Server - Model Context Protocol server for Velociraptor DFIR platform",
     )
     parser.add_argument(
         "--host",
@@ -39,15 +39,7 @@ def create_parser() -> argparse.ArgumentParser:
         default="INFO",
         help="Logging level (default: INFO)",
     )
-    parser.add_argument("--wazuh-url", help="Wazuh Manager URL (overrides WAZUH_PROD_URL env var)")
-    parser.add_argument(
-        "--wazuh-username",
-        help="Wazuh username (overrides WAZUH_PROD_USERNAME env var)",
-    )
-    parser.add_argument(
-        "--wazuh-password",
-        help="Wazuh password (overrides WAZUH_PROD_PASSWORD env var)",
-    )
+    parser.add_argument("--api-config", help="Path to Velociraptor api.config.yaml file (overrides VELOCIRAPTOR_API_KEY env var)")
     parser.add_argument(
         "--no-ssl-verify",
         action="store_true",
@@ -67,14 +59,10 @@ def main() -> None:
     config = Config.from_env()
 
     # Override with CLI arguments
-    if args.wazuh_url:
-        config.wazuh.url = args.wazuh_url
-    if args.wazuh_username:
-        config.wazuh.username = args.wazuh_username
-    if args.wazuh_password:
-        config.wazuh.password = args.wazuh_password
+    if args.api_config:
+        config.velociraptor.api_key = args.api_config
     if args.no_ssl_verify:
-        config.wazuh.ssl_verify = False
+        config.velociraptor.ssl_verify = False
 
     config.server.host = args.host
     config.server.port = args.port
