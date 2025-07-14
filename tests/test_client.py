@@ -1,5 +1,5 @@
 """
-Tests for Wazuh client.
+Tests for Velociraptor client.
 """
 
 import json
@@ -7,683 +7,150 @@ from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 
-from velociraptor_mcp_server.client import WazuhClient
-from velociraptor_mcp_server.config import WazuhConfig
+from velociraptor_mcp_server.client import VelociraptorClient
 
 
-class TestWazuhClient:
-    """Test Wazuh client."""
+class TestVelociraptorClient:
+    """Test Velociraptor client."""
 
-    @pytest.mark.asyncio
-    async def test_init(self, wazuh_config):
-        """Test WazuhClient initialization."""
-        client = WazuhClient(wazuh_config)
+    def test_init(self, velociraptor_config):
+        """Test VelociraptorClient initialization."""
+        client = VelociraptorClient(velociraptor_config)
 
-        assert client.config == wazuh_config
-        assert client._token is None
-        assert client._expiry == 0.0
-        assert client._basic == (wazuh_config.username, wazuh_config.password)
+        assert client.config == velociraptor_config
+        assert client.stub is None
 
     @pytest.mark.asyncio
-    async def test_refresh_token_success(self, wazuh_client, mock_httpx_client):
-        """Test successful token refresh."""
-        # Mock response
-        mock_response = Mock()
-        mock_response.raise_for_status = Mock()
-        mock_response.json.return_value = {"data": {"token": "test-token-123"}}
-        mock_httpx_client.post.return_value = mock_response
-
-        await wazuh_client._refresh_token()
-
-        assert wazuh_client._token == "test-token-123"
-        assert wazuh_client._expiry > 0
-        mock_httpx_client.post.assert_called_once()
-
-    @pytest.mark.asyncio
-    async def test_refresh_token_skip_if_valid(self, wazuh_client, mock_httpx_client):
-        """Test token refresh is skipped if token is still valid."""
-        # Set a valid token
-        wazuh_client._token = "valid-token"
-        wazuh_client._expiry = 9999999999  # Far future
-
-        await wazuh_client._refresh_token()
-
-        # Should not call post since token is valid
-        mock_httpx_client.post.assert_not_called()
-
-    @pytest.mark.asyncio
-    async def test_request_success(self, wazuh_client, mock_httpx_client):
-        """Test successful API request."""
-        # Mock token refresh
-        mock_response = Mock()
-        mock_response.raise_for_status = Mock()
-        mock_response.json.return_value = {"data": {"token": "test-token"}}
-        mock_httpx_client.post.return_value = mock_response
-
-        # Mock API request
-        mock_api_response = Mock()
-        mock_api_response.raise_for_status = Mock()
-        mock_httpx_client.request.return_value = mock_api_response
-
-        result = await wazuh_client.request("GET", "/test")
-
-        assert result == mock_api_response
-        mock_httpx_client.request.assert_called_once_with(
-            "GET",
-            "/test",
-            headers={"Authorization": "Bearer test-token"},
-        )
+    async def test_authenticate_success(self, velociraptor_client, mock_grpc_client):
+        """Test successful authentication."""
+        # Mock the authentication process
+        mock_query_response = Mock()
+        mock_query_response.Response = json.dumps([{"user": "test_user", "permissions": ["READ"]}])
+        
+        mock_grpc_client.Query.return_value = mock_query_response
+        
+        with patch('grpc.ssl_channel_credentials'), \
+             patch('grpc.secure_channel'), \
+             patch('velociraptor_mcp_server.client.api_pb2_grpc.APIStub', return_value=mock_grpc_client), \
+             patch('yaml.safe_load', return_value={
+                 'ca_certificate': 'test_ca_cert',
+                 'client_cert': 'test_client_cert', 
+                 'client_private_key': 'test_private_key',
+                 'api_connection_string': 'localhost:8001'
+             }), \
+             patch('builtins.open', Mock()):
+            
+            result = await velociraptor_client.authenticate()
+            
+            assert "user" in result[0]
+            assert result[0]["user"] == "test_user"
+            assert velociraptor_client.stub is not None
 
     @pytest.mark.asyncio
-    async def test_get_agents_success(self, wazuh_client, mock_httpx_client):
-        """Test successful get_agents call."""
-        # Mock token refresh
-        mock_response = Mock()
-        mock_response.raise_for_status = Mock()
-        mock_response.json.return_value = {"data": {"token": "test-token"}}
-        mock_httpx_client.post.return_value = mock_response
-
-        # Mock agents request
-        mock_agents_response = Mock()
-        mock_agents_response.raise_for_status = Mock()
-        mock_agents_response.json.return_value = {
-            "data": {"affected_items": [{"id": "001", "name": "agent1"}]},
-        }
-        mock_httpx_client.request.return_value = mock_agents_response
-
-        result = await wazuh_client.get_agents(status=["active"], limit=100, offset=0)
-
-        expected_data = {"data": {"affected_items": [{"id": "001", "name": "agent1"}]}}
-        assert result == expected_data
-
-        # Check that request was made with correct parameters
-        mock_httpx_client.request.assert_called_once_with(
-            "GET",
-            "/agents",
-            headers={"Authorization": "Bearer test-token"},
-            params={"status": "active", "limit": 100, "offset": 0},
-        )
-
-    @pytest.mark.asyncio
-    async def test_get_agents_with_all_parameters(self, wazuh_client, mock_httpx_client):
-        """Test get_agents call with all parameters."""
-        # Mock token refresh
-        mock_response = Mock()
-        mock_response.raise_for_status = Mock()
-        mock_response.json.return_value = {"data": {"token": "test-token"}}
-        mock_httpx_client.post.return_value = mock_response
-
-        # Mock agents request
-        mock_agents_response = Mock()
-        mock_agents_response.raise_for_status = Mock()
-        mock_agents_response.json.return_value = {
-            "data": {"affected_items": [{"id": "001", "name": "agent1"}]},
-        }
-        mock_httpx_client.request.return_value = mock_agents_response
-
-        result = await wazuh_client.get_agents(
-            status=["active"],
-            limit=100,
-            offset=10,
-            sort="name",
-            search="agent",
-            select=["id", "name", "status"],
-            q="name=agent1",
-            distinct=True,
-        )
-
-        expected_data = {"data": {"affected_items": [{"id": "001", "name": "agent1"}]}}
-        assert result == expected_data
-
-        # Check that request was made with correct parameters
-        mock_httpx_client.request.assert_called_once_with(
-            "GET",
-            "/agents",
-            headers={"Authorization": "Bearer test-token"},
-            params={
-                "status": "active",
-                "limit": 100,
-                "offset": 10,
-                "sort": "name",
-                "search": "agent",
-                "select": "id,name,status",
-                "q": "name=agent1",
-                "distinct": "true",
-            },
-        )
-
-    @pytest.mark.asyncio
-    async def test_get_agent_ports_success(self, wazuh_client, mock_httpx_client):
-        """Test successful agent ports retrieval."""
-        # Mock token refresh
-        mock_auth_response = Mock()
-        mock_auth_response.raise_for_status = Mock()
-        mock_auth_response.json.return_value = {"data": {"token": "test-token"}}
-        mock_httpx_client.post.return_value = mock_auth_response
-
-        # Mock agent ports response
-        mock_response = Mock()
-        mock_response.raise_for_status = Mock()
-        mock_response.json.return_value = {
-            "data": {
-                "affected_items": [
-                    {
-                        "local": {"ip": "127.0.0.1", "port": 80},
-                        "remote": {"ip": "0.0.0.0", "port": 0},
-                        "protocol": "tcp",
-                        "state": "listening",
-                    },
-                ],
-                "total_affected_items": 1,
-            },
-        }
-        mock_httpx_client.request.return_value = mock_response
-
-        result = await wazuh_client.get_agent_ports("000")
-
-        assert "data" in result
-        assert "affected_items" in result["data"]
-        mock_httpx_client.request.assert_called_once_with(
-            "GET",
-            "/syscollector/000/ports",
-            headers={"Authorization": "Bearer test-token"},
-            params={"limit": 500, "offset": 0},
-        )
-
-    @pytest.mark.asyncio
-    async def test_get_agent_ports_with_filters(self, wazuh_client, mock_httpx_client):
-        """Test agent ports retrieval with filters."""
-        # Mock token refresh
-        mock_auth_response = Mock()
-        mock_auth_response.raise_for_status = Mock()
-        mock_auth_response.json.return_value = {"data": {"token": "test-token"}}
-        mock_httpx_client.post.return_value = mock_auth_response
-
-        # Mock agent ports response
-        mock_response = Mock()
-        mock_response.raise_for_status = Mock()
-        mock_response.json.return_value = {"data": {"affected_items": []}}
-        mock_httpx_client.request.return_value = mock_response
-
-        result = await wazuh_client.get_agent_ports(
-            agent_id="001",
-            protocol="tcp",
-            local_ip="127.0.0.1",
-            state="listening",
-            limit=100,
-        )
-
-        assert "data" in result
-        mock_httpx_client.request.assert_called_once_with(
-            "GET",
-            "/syscollector/001/ports",
-            headers={"Authorization": "Bearer test-token"},
-            params={
-                "limit": 100,
-                "offset": 0,
-                "protocol": "tcp",
-                "local.ip": "127.0.0.1",
-                "state": "listening",
-            },
-        )
-
-    @pytest.mark.asyncio
-    async def test_authenticate_success(self, wazuh_client, mock_httpx_client):
-        """Test successful authenticate call."""
-        # Mock token refresh
-        mock_response = Mock()
-        mock_response.raise_for_status = Mock()
-        mock_response.json.return_value = {"data": {"token": "test-token"}}
-        mock_httpx_client.post.return_value = mock_response
-
-        result = await wazuh_client.authenticate()
-
-        assert result["status"] == "authenticated"
-        assert "token_expiry" in result
-        assert result["token_expiry"] > 0
-
-    @pytest.mark.asyncio
-    async def test_close(self, wazuh_client, mock_httpx_client):
-        """Test client close."""
-        await wazuh_client.close()
-
-        mock_httpx_client.aclose.assert_called_once()
-
-    @pytest.mark.asyncio
-    async def test_context_manager(self, wazuh_config, mock_httpx_client):
-        """Test async context manager."""
-        client = WazuhClient(wazuh_config)
-        client._client = mock_httpx_client
-
-        async with client as c:
-            assert c == client
-
-        mock_httpx_client.aclose.assert_called_once()
-
-    @pytest.mark.asyncio
-    async def test_get_agent_packages_success(self, wazuh_client, mock_httpx_client):
-        """Test successful agent packages retrieval."""
-        # Mock token refresh
-        mock_auth_response = Mock()
-        mock_auth_response.raise_for_status = Mock()
-        mock_auth_response.json.return_value = {"data": {"token": "test-token"}}
-        mock_httpx_client.post.return_value = mock_auth_response
-
-        # Mock agent packages response
-        mock_response = Mock()
-        mock_response.raise_for_status = Mock()
-        mock_response.json.return_value = {
-            "data": {
-                "affected_items": [
-                    {
-                        "name": "openssh-client",
-                        "version": "1:8.2p1-4ubuntu0.2",
-                        "architecture": "amd64",
-                        "format": "deb",
-                        "vendor": "Ubuntu Developers",
-                        "agent_id": "001",
-                    },
-                ],
-                "total_affected_items": 1,
-            },
-        }
-        mock_httpx_client.request.return_value = mock_response
-
-        result = await wazuh_client.get_agent_packages("001")
-
-        assert "data" in result
-        assert "affected_items" in result["data"]
-        mock_httpx_client.request.assert_called_once_with(
-            "GET",
-            "/syscollector/001/packages",
-            headers={"Authorization": "Bearer test-token"},
-            params={"limit": 500, "offset": 0},
-        )
-
-    @pytest.mark.asyncio
-    async def test_get_agent_packages_with_filters(self, wazuh_client, mock_httpx_client):
-        """Test agent packages retrieval with filters."""
-        # Mock token refresh
-        mock_auth_response = Mock()
-        mock_auth_response.raise_for_status = Mock()
-        mock_auth_response.json.return_value = {"data": {"token": "test-token"}}
-        mock_httpx_client.post.return_value = mock_auth_response
-
-        # Mock agent packages response
-        mock_response = Mock()
-        mock_response.raise_for_status = Mock()
-        mock_response.json.return_value = {"data": {"affected_items": []}}
-        mock_httpx_client.request.return_value = mock_response
-
-        result = await wazuh_client.get_agent_packages(
-            agent_id="001",
-            vendor="Ubuntu",
-            name="openssh",
-            architecture="amd64",
-            format="deb",
-            limit=100,
-        )
-
-        assert "data" in result
-        mock_httpx_client.request.assert_called_once_with(
-            "GET",
-            "/syscollector/001/packages",
-            headers={"Authorization": "Bearer test-token"},
-            params={
-                "limit": 100,
-                "offset": 0,
-                "vendor": "Ubuntu",
-                "name": "openssh",
-                "architecture": "amd64",
-                "format": "deb",
-            },
-        )
-
-    @pytest.mark.asyncio
-    async def test_get_agent_processes_success(self, wazuh_client, mock_httpx_client):
-        """Test successful agent processes retrieval."""
-        # Mock token refresh
-        mock_auth_response = Mock()
-        mock_auth_response.raise_for_status = Mock()
-        mock_auth_response.json.return_value = {"data": {"token": "test-token"}}
-        mock_httpx_client.post.return_value = mock_auth_response
-
-        # Mock agent processes response
-        mock_response = Mock()
-        mock_response.raise_for_status = Mock()
-        mock_response.json.return_value = {"data": {"affected_items": []}}
-        mock_httpx_client.request.return_value = mock_response
-
-        result = await wazuh_client.get_agent_processes("001")
-
-        assert "data" in result
-        mock_httpx_client.request.assert_called_once_with(
-            "GET",
-            "/syscollector/001/processes",
-            headers={"Authorization": "Bearer test-token"},
-            params={"limit": 500, "offset": 0},
-        )
-
-    @pytest.mark.asyncio
-    async def test_get_agent_processes_with_filters(self, wazuh_client, mock_httpx_client):
-        """Test agent processes retrieval with filters."""
-        # Mock token refresh
-        mock_auth_response = Mock()
-        mock_auth_response.raise_for_status = Mock()
-        mock_auth_response.json.return_value = {"data": {"token": "test-token"}}
-        mock_httpx_client.post.return_value = mock_auth_response
-
-        # Mock agent processes response
-        mock_response = Mock()
-        mock_response.raise_for_status = Mock()
-        mock_response.json.return_value = {"data": {"affected_items": []}}
-        mock_httpx_client.request.return_value = mock_response
-
-        result = await wazuh_client.get_agent_processes(
-            agent_id="001",
-            pid="1234",
-            state="S",
-            name="bash",
-            euser="root",
-            limit=100,
-        )
-
-        assert "data" in result
-        mock_httpx_client.request.assert_called_once_with(
-            "GET",
-            "/syscollector/001/processes",
-            headers={"Authorization": "Bearer test-token"},
-            params={
-                "limit": 100,
-                "offset": 0,
-                "pid": "1234",
-                "state": "S",
-                "name": "bash",
-                "euser": "root",
-            },
-        )
-
-    @pytest.mark.asyncio
-    async def test_list_rules_success(self, wazuh_client, mock_httpx_client):
-        """Test successful list_rules call."""
-        # Mock token refresh
-        mock_auth_response = Mock()
-        mock_auth_response.raise_for_status = Mock()
-        mock_auth_response.json.return_value = {"data": {"token": "test-token"}}
-        mock_httpx_client.post.return_value = mock_auth_response
-
-        # Mock rules request
-        mock_response = Mock()
-        mock_response.raise_for_status = Mock()
-        mock_response.json.return_value = {"data": {"affected_items": []}}
-        mock_httpx_client.request.return_value = mock_response
-
-        result = await wazuh_client.list_rules()
-
-        assert "data" in result
-        mock_httpx_client.request.assert_called_once_with(
-            "GET",
-            "/rules",
-            headers={"Authorization": "Bearer test-token"},
-            params={"limit": 500, "offset": 0},
-        )
-
-    @pytest.mark.asyncio
-    async def test_list_rules_with_filters(self, wazuh_client, mock_httpx_client):
-        """Test list_rules with various filters."""
-        # Mock token refresh
-        mock_auth_response = Mock()
-        mock_auth_response.raise_for_status = Mock()
-        mock_auth_response.json.return_value = {"data": {"token": "test-token"}}
-        mock_httpx_client.post.return_value = mock_auth_response
-
-        # Mock rules request
-        mock_response = Mock()
-        mock_response.raise_for_status = Mock()
-        mock_response.json.return_value = {"data": {"affected_items": []}}
-        mock_httpx_client.request.return_value = mock_response
-
-        result = await wazuh_client.list_rules(
-            rule_ids=[1001, 1002],
-            status="enabled",
-            group="authentication",
-            level="5",
-            filename=["0020-syslog_rules.xml"],
-            pci_dss="0.2.4",
-            limit=100,
-        )
-
-        assert "data" in result
-        mock_httpx_client.request.assert_called_once_with(
-            "GET",
-            "/rules",
-            headers={"Authorization": "Bearer test-token"},
-            params={
-                "limit": 100,
-                "offset": 0,
-                "rule_ids": "1001,1002",
-                "status": "enabled",
-                "group": "authentication",
-                "level": "5",
-                "filename": "0020-syslog_rules.xml",
-                "pci_dss": "0.2.4",
-            },
-        )
-
-    @pytest.mark.asyncio
-    async def test_get_rule_file_content_success(self, wazuh_client, mock_httpx_client):
-        """Test successful get_rule_file_content call."""
-        # Mock token refresh
-        mock_auth_response = Mock()
-        mock_auth_response.raise_for_status = Mock()
-        mock_auth_response.json.return_value = {"data": {"token": "test-token"}}
-        mock_httpx_client.post.return_value = mock_auth_response
-
-        # Mock rule file content request
-        mock_response = Mock()
-        mock_response.raise_for_status = Mock()
-        mock_response.json.return_value = {"data": {"affected_items": []}}
-        mock_httpx_client.request.return_value = mock_response
-
-        result = await wazuh_client.get_rule_file_content("0020-syslog_rules.xml")
-
-        assert "data" in result
-        mock_httpx_client.request.assert_called_once_with(
-            "GET",
-            "/rules/files/0020-syslog_rules.xml",
-            headers={"Authorization": "Bearer test-token"},
-            params={},
-        )
-
-    @pytest.mark.asyncio
-    async def test_get_rule_file_content_with_options(self, wazuh_client, mock_httpx_client):
-        """Test get_rule_file_content with raw=True option."""
-        # Mock token refresh
-        mock_auth_response = Mock()
-        mock_auth_response.raise_for_status = Mock()
-        mock_auth_response.json.return_value = {"data": {"token": "test-token"}}
-        mock_httpx_client.post.return_value = mock_auth_response
-
-        # Mock rule file content request for raw response
-        mock_response = Mock()
-        mock_response.raise_for_status = Mock()
-        mock_response.text = "<xml>rule content</xml>"  # Raw XML content
-        mock_httpx_client.request.return_value = mock_response
-
-        result = await wazuh_client.get_rule_file_content(
-            filename="0020-syslog_rules.xml",
-            raw=True,
-            relative_dirname="ruleset/rules",
-        )
-
-        assert "content" in result
-        assert result["content"] == "<xml>rule content</xml>"
-        assert result["raw"] is True
-        assert result["filename"] == "0020-syslog_rules.xml"
-        mock_httpx_client.request.assert_called_once_with(
-            "GET",
-            "/rules/files/0020-syslog_rules.xml",
-            headers={"Authorization": "Bearer test-token"},
-            params={
-                "raw": "true",  # Should be string
-                "relative_dirname": "ruleset/rules",
-            },
-        )
-
-    @pytest.mark.asyncio
-    async def test_get_rule_file_content_raw_format(self, wazuh_client, mock_httpx_client):
-        """Test get_rule_file_content with raw format returning XML."""
-        # Mock token refresh
-        mock_auth_response = Mock()
-        mock_auth_response.raise_for_status = Mock()
-        mock_auth_response.json.return_value = {"data": {"token": "test-token"}}
-        mock_httpx_client.post.return_value = mock_auth_response
-
-        # Mock rule file content request for raw XML response
-        mock_response = Mock()
-        mock_response.raise_for_status = Mock()
-        mock_response.text = (
-            '<?xml version="1.0"?><group name="sysmon"><rule id="60004">...</rule></group>'
-        )
-        mock_httpx_client.request.return_value = mock_response
-
-        result = await wazuh_client.get_rule_file_content(
-            filename="0575-win-base_rules.xml",
-            raw=True,
-        )
-
-        assert "content" in result
-        assert result["raw"] is True
-        assert result["filename"] == "0575-win-base_rules.xml"
-        assert "<?xml" in result["content"]
-        mock_httpx_client.request.assert_called_once_with(
-            "GET",
-            "/rules/files/0575-win-base_rules.xml",
-            headers={"Authorization": "Bearer test-token"},
-            params={"raw": "true"},
-        )
-
-    @pytest.mark.asyncio
-    async def test_get_agent_sca_success(self, wazuh_client, mock_httpx_client):
-        """Test successful get_agent_sca call."""
-        # Mock token refresh
-        mock_auth_response = Mock()
-        mock_auth_response.raise_for_status = Mock()
-        mock_auth_response.json.return_value = {"data": {"token": "test-token"}}
-        mock_httpx_client.post.return_value = mock_auth_response
-
-        # Mock SCA request
-        mock_response = Mock()
-        mock_response.raise_for_status = Mock()
-        mock_response.json.return_value = {"data": {"affected_items": []}}
-        mock_httpx_client.request.return_value = mock_response
-
-        result = await wazuh_client.get_agent_sca("001")
-
-        assert "data" in result
-        mock_httpx_client.request.assert_called_once_with(
-            "GET",
-            "/sca/001",
-            headers={"Authorization": "Bearer test-token"},
-            params={"limit": 500, "offset": 0},
-        )
-
-    @pytest.mark.asyncio
-    async def test_get_agent_sca_with_filters(self, wazuh_client, mock_httpx_client):
-        """Test get_agent_sca with various filters."""
-        # Mock token refresh
-        mock_auth_response = Mock()
-        mock_auth_response.raise_for_status = Mock()
-        mock_auth_response.json.return_value = {"data": {"token": "test-token"}}
-        mock_httpx_client.post.return_value = mock_auth_response
-
-        # Mock SCA request
-        mock_response = Mock()
-        mock_response.raise_for_status = Mock()
-        mock_response.json.return_value = {"data": {"affected_items": []}}
-        mock_httpx_client.request.return_value = mock_response
-
-        result = await wazuh_client.get_agent_sca(
-            agent_id="001",
-            name="CIS benchmark",
-            description="Ubuntu",
-            references="https://www.cisecurity.org",
-            limit=100,
-        )
-
-        assert "data" in result
-        mock_httpx_client.request.assert_called_once_with(
-            "GET",
-            "/sca/001",
-            headers={"Authorization": "Bearer test-token"},
-            params={
-                "limit": 100,
-                "offset": 0,
-                "name": "CIS benchmark",
-                "description": "Ubuntu",
-                "references": "https://www.cisecurity.org",
-            },
-        )
-
-    @pytest.mark.asyncio
-    async def test_get_sca_policy_checks_success(self, wazuh_client, mock_httpx_client):
-        """Test successful get_sca_policy_checks call."""
-        # Mock token refresh
-        mock_auth_response = Mock()
-        mock_auth_response.raise_for_status = Mock()
-        mock_auth_response.json.return_value = {"data": {"token": "test-token"}}
-        mock_httpx_client.post.return_value = mock_auth_response
-
-        # Mock SCA policy checks request
-        mock_response = Mock()
-        mock_response.raise_for_status = Mock()
-        mock_response.json.return_value = {"data": {"affected_items": []}}
-        mock_httpx_client.request.return_value = mock_response
-
-        result = await wazuh_client.get_sca_policy_checks("001", "cis_ubuntu20-04")
-
-        assert "data" in result
-        mock_httpx_client.request.assert_called_once_with(
-            "GET",
-            "/sca/001/checks/cis_ubuntu20-04",
-            headers={"Authorization": "Bearer test-token"},
-            params={"limit": 500, "offset": 0},
-        )
-
-    @pytest.mark.asyncio
-    async def test_get_sca_policy_checks_with_filters(self, wazuh_client, mock_httpx_client):
-        """Test get_sca_policy_checks with various filters."""
-        # Mock token refresh
-        mock_auth_response = Mock()
-        mock_auth_response.raise_for_status = Mock()
-        mock_auth_response.json.return_value = {"data": {"token": "test-token"}}
-        mock_httpx_client.post.return_value = mock_auth_response
-
-        # Mock SCA policy checks request
-        mock_response = Mock()
-        mock_response.raise_for_status = Mock()
-        mock_response.json.return_value = {"data": {"affected_items": []}}
-        mock_httpx_client.request.return_value = mock_response
-
-        result = await wazuh_client.get_sca_policy_checks(
-            agent_id="001",
-            policy_id="cis_ubuntu20-04",
-            title="filesystem",
-            result="failed",
-            remediation="Edit",
-            limit=100,
-        )
-
-        assert "data" in result
-        mock_httpx_client.request.assert_called_once_with(
-            "GET",
-            "/sca/001/checks/cis_ubuntu20-04",
-            headers={"Authorization": "Bearer test-token"},
-            params={
-                "limit": 100,
-                "offset": 0,
-                "title": "filesystem",
-                "result": "failed",
-                "remediation": "Edit",
-            },
-        )
+    async def test_authenticate_file_not_found(self, velociraptor_client):
+        """Test authentication when config file is not found."""
+        with patch('builtins.open', side_effect=FileNotFoundError("Config file not found")):
+            with pytest.raises(Exception):
+                await velociraptor_client.authenticate()
+
+    def test_run_vql_query_success(self, velociraptor_client, mock_grpc_client):
+        """Test successful VQL query execution."""
+        # Set up authenticated client
+        velociraptor_client.stub = mock_grpc_client
+        
+        # Mock VQL query response
+        mock_query_response = Mock()
+        mock_query_response.Response = json.dumps([
+            {"client_id": "C.1234567890", "hostname": "test-host"},
+            {"client_id": "C.0987654321", "hostname": "test-host-2"}
+        ])
+        
+        mock_grpc_client.Query.return_value = mock_query_response
+        
+        result = velociraptor_client.run_vql_query("SELECT * FROM clients() LIMIT 10")
+        
+        assert len(result) == 2
+        assert result[0]["client_id"] == "C.1234567890"
+        assert result[1]["hostname"] == "test-host-2"
+
+    def test_run_vql_query_not_authenticated(self, velociraptor_client):
+        """Test VQL query when client is not authenticated."""
+        # Client stub is None (not authenticated)
+        assert velociraptor_client.stub is None
+        
+        with pytest.raises(Exception):
+            velociraptor_client.run_vql_query("SELECT * FROM clients()")
+
+    def test_find_client_info_success(self, velociraptor_client, mock_grpc_client):
+        """Test successful client info lookup by hostname."""
+        # Set up authenticated client
+        velociraptor_client.stub = mock_grpc_client
+        
+        # Mock VQL query response for client search
+        mock_query_response = Mock()
+        mock_query_response.Response = json.dumps([{
+            "client_id": "C.1234567890",
+            "FirstSeen": "2023-01-01T00:00:00Z",
+            "LastSeen": "2023-01-02T00:00:00Z", 
+            "Hostname": "test-host",
+            "Fqdn": "test-host.domain.com",
+            "OSType": "Linux",
+            "OS": "Ubuntu 20.04",
+            "Machine": "x86_64",
+            "AgentVersion": "0.72.0"
+        }])
+        
+        mock_grpc_client.Query.return_value = mock_query_response
+        
+        result = velociraptor_client.find_client_info("test-host")
+        
+        assert result is not None
+        assert result["client_id"] == "C.1234567890"
+        assert result["Hostname"] == "test-host"
+        assert result["OSType"] == "Linux"
+
+    def test_find_client_info_not_found(self, velociraptor_client, mock_grpc_client):
+        """Test client info lookup when client is not found."""
+        # Set up authenticated client
+        velociraptor_client.stub = mock_grpc_client
+        
+        # Mock empty VQL query response
+        mock_query_response = Mock()
+        mock_query_response.Response = json.dumps([])
+        
+        mock_grpc_client.Query.return_value = mock_query_response
+        
+        result = velociraptor_client.find_client_info("nonexistent-host")
+        
+        assert result is None
+
+    def test_start_collection_success(self, velociraptor_client, mock_grpc_client):
+        """Test successful collection start."""
+        # Set up authenticated client  
+        velociraptor_client.stub = mock_grpc_client
+        
+        # Mock collection start response
+        mock_query_response = Mock()
+        mock_query_response.Response = json.dumps([{
+            "flow_id": "F.1234567890",
+            "status": "RUNNING"
+        }])
+        
+        mock_grpc_client.Query.return_value = mock_query_response
+        
+        result = velociraptor_client.start_collection("C.1234567890", "Windows.System.Users")
+        
+        assert len(result) == 1
+        assert result[0]["flow_id"] == "F.1234567890"
+        assert result[0]["status"] == "RUNNING"
+
+    def test_close(self, velociraptor_client):
+        """Test client close method."""
+        # Mock channel
+        mock_channel = Mock()
+        mock_channel.close = Mock()
+        velociraptor_client._channel = mock_channel
+        
+        velociraptor_client.close()
+        
+        mock_channel.close.assert_called_once()
