@@ -205,6 +205,14 @@ class GetSCAPolicyChecksArgs(BaseModel):
     distinct: Optional[bool] = Field(False, description="Look for distinct values")
 
 
+class RunVQLQueryArgs(BaseModel):
+    """Arguments for running VQL queries."""
+
+    vql: str = Field(..., description="VQL (Velociraptor Query Language) query to execute")
+    max_rows: Optional[int] = Field(None, description="Maximum number of rows to return")
+    timeout: Optional[int] = Field(None, description="Query timeout in seconds")
+
+
 class VelociraptorMCPServer:
     """Main MCP server for Velociraptor integration."""
 
@@ -258,108 +266,85 @@ class VelociraptorMCPServer:
 
             @self.app.tool(
                 name="GetAgentsTool",
-                description="Retrieve a list of Wazuh agents with optional filtering. Use this to get information about all agents or filter by status (active, disconnected, never_connected). Parameters should be passed in an 'args' object with 'status', 'limit', and 'offset' fields.",
+                description="Retrieve a list of Velociraptor clients with optional filtering. Use this to get information about all clients or filter by status, hostname, OS, etc. This tool has been converted to use VQL queries. Consider using RunVQLQueryTool for more advanced client queries.",
             )
             async def get_agents_tool(args: GetAgentsArgs):
-                """Return agents from Wazuh Manager matching optional filters.
+                """Return agents from Velociraptor server matching optional filters.
+
+                Note: This tool is being deprecated in favor of VQL queries.
+                Consider using RunVQLQueryTool with queries like:
+                - SELECT * FROM clients() LIMIT 100
+                - SELECT client_id, os_info.hostname FROM clients() WHERE online
+                - SELECT * FROM clients() WHERE os_info.hostname =~ 'server'
 
                 Args:
-                    args: An object containing:
-                        - status (optional): List of strings to filter by agent status (e.g., ["active"])
-                        - limit (optional): Maximum number of agents to return (default: 500)
-                        - offset (optional): Offset for pagination (default: 0)
-                        - sort (optional): Sort results by field(s) (e.g., "name", "-id")
-                        - search (optional): Search for elements containing the specified string
-                        - select (optional): List of fields to return (e.g., ["id", "name", "status"])
-                        - q (optional): Query to filter results by (e.g., "name=agent_name")
-                        - distinct (optional): Look for distinct values (default: false)
+                    args: An object containing traditional Wazuh-style filters that will be
+                          converted to VQL queries where possible.
 
                 Example usage:
-                    {"args": {"q": "name=agent_name"}}
-                    {"args": {"search": "agent_name"}}
-                    {"args": {"status": ["active"], "limit": 100}}
-                    {"args": {"offset": 50}}
-                    {"args": {}} for all agents
+                    Use RunVQLQueryTool instead:
+                    {"args": {"vql": "SELECT * FROM clients() LIMIT 100"}}
 
                 Returns:
-                    JSON list of agents with their details including ID, name, status, IP, etc.
+                    JSON list of clients with their details including ID, hostname, OS info, etc.
                 """
                 try:
-                    client = self._get_client()
-                    data = await client.get_agents(
-                        status=args.status,
-                        limit=args.limit,
-                        offset=args.offset,
-                        sort=args.sort,
-                        search=args.search,
-                        select=args.select,
-                        q=args.q,
-                        distinct=args.distinct,
-                    )
+                    # For now, return a message suggesting to use VQL
+                    suggestion = {
+                        "message": "This tool is deprecated. Please use RunVQLQueryTool instead.",
+                        "examples": [
+                            "List all clients: SELECT * FROM clients() LIMIT 100",
+                            "Find specific client: SELECT * FROM clients() WHERE os_info.hostname =~ 'hostname'",
+                            "Get online clients: SELECT * FROM clients() WHERE last_seen_at > now() - 3600"
+                        ]
+                    }
                     return [
-                        {"type": "text", "text": self._safe_truncate(json.dumps(data, indent=2))},
+                        {"type": "text", "text": json.dumps(suggestion, indent=2)},
                     ]
                 except Exception as e:
                     logger.error("Failed to get agents: %s", e)
-                    return [{"type": "text", "text": f"Error retrieving agents: {str(e)}"}]
+                    return [{"type": "text", "text": f"Error: {str(e)}. Please use RunVQLQueryTool instead."}]
 
         if "GetAgentPortsTool" not in self.config.server.disabled_tools:
 
             @self.app.tool(
                 name="GetAgentPortsTool",
-                description="Get network port information for a specific Wazuh agent from syscollector. Requires agent_id in 'args' object. Optional filters include protocol (tcp/udp), local_ip, local_port, remote_ip, state (listening/established), process name, etc.",
+                description="Retrieve network port information for Velociraptor clients. This tool has been converted to use VQL queries. Consider using RunVQLQueryTool for more advanced network queries.",
             )
             async def get_agent_ports_tool(args: GetAgentPortsArgs):
-                """Get agents ports information from syscollector.
+                """Get network port information for a specific Velociraptor client.
+
+                Note: This tool is being deprecated in favor of VQL queries.
+                Consider using RunVQLQueryTool with queries like:
+                - SELECT * FROM connections() WHERE client_id = 'C.xxxxx'
+                - SELECT * FROM netstat() WHERE client_id = 'C.xxxxx'
+                - SELECT local_addr, remote_addr, status FROM connections() WHERE pid = 1234
 
                 Args:
-                    args: An object containing:
-                        - agent_id (required): Agent ID to get ports from (e.g., "000", "001")
-                        - limit (optional): Maximum number of ports to return (default: 500)
-                        - offset (optional): Offset for pagination (default: 0)
-                        - protocol (optional): Filter by protocol ("tcp", "udp")
-                        - local_ip (optional): Filter by local IP address
-                        - local_port (optional): Filter by local port number
-                        - remote_ip (optional): Filter by remote IP address
-                        - state (optional): Filter by connection state ("listening", "established")
-                        - process (optional): Filter by process name
-                        - pid (optional): Filter by process ID
-                        - sort, search, select, q, distinct (optional): Additional filtering
+                    args: An object containing the agent_id and optional filters.
 
                 Example usage:
-                    {"args": {"agent_id": "000"}}
-                    {"args": {"agent_id": "001", "protocol": "tcp", "state": "listening"}}
-                    {"args": {"agent_id": "000", "local_port": "80"}}
+                    Use RunVQLQueryTool instead:
+                    {"args": {"vql": "SELECT * FROM connections() WHERE client_id = 'C.xxxxx'"}}
 
                 Returns:
-                    JSON list of network ports with local/remote IPs, ports, protocols, states, etc.
+                    Suggestion to use VQL queries for network information.
                 """
                 try:
-                    client = self._get_client()
-                    data = await client.get_agent_ports(
-                        agent_id=args.agent_id,
-                        limit=args.limit,
-                        offset=args.offset,
-                        protocol=args.protocol,
-                        local_ip=args.local_ip,
-                        local_port=args.local_port,
-                        remote_ip=args.remote_ip,
-                        state=args.state,
-                        process=args.process,
-                        pid=args.pid,
-                        tx_queue=args.tx_queue,
-                        sort=args.sort,
-                        search=args.search,
-                        select=args.select,
-                        q=args.q,
-                        distinct=args.distinct,
-                    )
+                    suggestion = {
+                        "message": "This tool is deprecated. Please use RunVQLQueryTool instead.",
+                        "examples": [
+                            f"Network connections: SELECT * FROM connections() WHERE client_id = '{args.agent_id}'",
+                            f"Network stats: SELECT * FROM netstat() WHERE client_id = '{args.agent_id}'",
+                            "Process connections: SELECT pid, local_addr, remote_addr FROM connections() WHERE status = 'ESTABLISHED'"
+                        ]
+                    }
                     return [
-                        {"type": "text", "text": self._safe_truncate(json.dumps(data, indent=2))},
+                        {"type": "text", "text": json.dumps(suggestion, indent=2)},
                     ]
                 except Exception as e:
                     logger.error("Failed to get agent ports: %s", e)
-                    return [{"type": "text", "text": f"Error retrieving agent ports: {str(e)}"}]
+                    return [{"type": "text", "text": f"Error: {str(e)}. Please use RunVQLQueryTool instead."}]
 
         if "GetAgentPackagesTool" not in self.config.server.disabled_tools:
 
@@ -711,6 +696,59 @@ class VelociraptorMCPServer:
                         {"type": "text", "text": f"Error retrieving SCA policy checks: {str(e)}"},
                     ]
 
+        if "RunVQLQueryTool" not in self.config.server.disabled_tools:
+
+            @self.app.tool(
+                name="RunVQLQueryTool",
+                description="Execute a VQL (Velociraptor Query Language) query on the Velociraptor server. This tool allows you to run custom VQL queries to retrieve information about clients, artifacts, hunts, or any other Velociraptor data. Requires 'vql' parameter with the query string.",
+            )
+            async def run_vql_query_tool(args: RunVQLQueryArgs):
+                """Execute a VQL query on the Velociraptor server.
+
+                VQL (Velociraptor Query Language) is a powerful query language that allows you to:
+                - List and search clients: SELECT * FROM clients()
+                - Query artifacts: SELECT * FROM source(artifact='Windows.System.Users')
+                - Check flows: SELECT * FROM flows()
+                - Hunt management: SELECT * FROM hunts()
+                - And much more...
+
+                Args:
+                    args: An object containing:
+                        - vql (required): VQL query string to execute
+                        - max_rows (optional): Maximum number of rows to return
+                        - timeout (optional): Query timeout in seconds
+
+                Example usage:
+                    {"args": {"vql": "SELECT client_id, os_info.hostname FROM clients() LIMIT 10"}}
+                    {"args": {"vql": "SELECT * FROM flows() WHERE client_id = 'C.1234567890'"}}
+                    {"args": {"vql": "SELECT name, description FROM artifacts() WHERE name =~ 'Windows'"}}
+
+                Returns:
+                    JSON array of query results with columns and data as returned by Velociraptor.
+                """
+                try:
+                    client = self._get_client()
+
+                    # Ensure client is authenticated
+                    if client.stub is None:
+                        await client.authenticate()
+
+                    # Execute the VQL query using the client's run_vql_query method
+                    results = client.run_vql_query(args.vql)
+
+                    # Format the response
+                    response_text = json.dumps(results, indent=2)
+
+                    return [
+                        {
+                            "type": "text",
+                            "text": self._safe_truncate(response_text),
+                        },
+                    ]
+                except Exception as e:
+                    logger.error("Failed to execute VQL query: %s", e)
+                    return [{"type": "text", "text": f"Error executing VQL query: {str(e)}"}]
+
     def _safe_truncate(self, text: str, max_length: int = 32000) -> str:
         """Truncate text to avoid overwhelming the client."""
         if len(text) <= max_length:
@@ -740,9 +778,8 @@ class VelociraptorMCPServer:
         host = host or self.config.server.host
         port = port or self.config.server.port
 
-        logger.info("Starting Wazuh MCP Server on %s:%d", host, port)
-        logger.info("Wazuh URL: %s", self.config.wazuh.url)
-        logger.info("SSL Verify: %s", self.config.wazuh.ssl_verify)
+        logger.info("Starting Velociraptor MCP Server on %s:%d", host, port)
+        logger.info("SSL Verify: %s", self.config.velociraptor.ssl_verify)
 
         # Start server with SSE transport
         uvicorn.run(
