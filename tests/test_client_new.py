@@ -29,17 +29,21 @@ class TestVelociraptorClient:
 
         mock_grpc_client.Query.return_value = mock_query_response
 
-        with patch('grpc.ssl_channel_credentials'), \
-             patch('grpc.secure_channel'), \
-             patch('velociraptor_mcp_server.client.api_pb2_grpc.APIStub', return_value=mock_grpc_client), \
-             patch('yaml.safe_load', return_value={
-                 'ca_certificate': 'test_ca_cert',
-                 'client_cert': 'test_client_cert',
-                 'client_private_key': 'test_private_key',
-                 'api_connection_string': 'localhost:8001'
-             }), \
-             patch('builtins.open', Mock()):
-
+        with patch("grpc.ssl_channel_credentials"), patch("grpc.secure_channel"), patch(
+            "velociraptor_mcp_server.client.api_pb2_grpc.APIStub",
+            return_value=mock_grpc_client,
+        ), patch(
+            "yaml.safe_load",
+            return_value={
+                "ca_certificate": "test_ca_cert",
+                "client_cert": "test_client_cert",
+                "client_private_key": "test_private_key",
+                "api_connection_string": "localhost:8001",
+            },
+        ), patch(
+            "builtins.open",
+            Mock(),
+        ):
             result = await velociraptor_client.authenticate()
 
             assert "user" in result[0]
@@ -49,7 +53,7 @@ class TestVelociraptorClient:
     @pytest.mark.asyncio
     async def test_authenticate_file_not_found(self, velociraptor_client):
         """Test authentication when config file is not found."""
-        with patch('builtins.open', side_effect=FileNotFoundError("Config file not found")):
+        with patch("builtins.open", side_effect=FileNotFoundError("Config file not found")):
             with pytest.raises(Exception):
                 await velociraptor_client.authenticate()
 
@@ -60,10 +64,12 @@ class TestVelociraptorClient:
 
         # Mock VQL query response
         mock_query_response = Mock()
-        mock_query_response.Response = json.dumps([
-            {"client_id": "C.1234567890", "hostname": "test-host"},
-            {"client_id": "C.0987654321", "hostname": "test-host-2"}
-        ])
+        mock_query_response.Response = json.dumps(
+            [
+                {"client_id": "C.1234567890", "hostname": "test-host"},
+                {"client_id": "C.0987654321", "hostname": "test-host-2"},
+            ],
+        )
 
         mock_grpc_client.Query.return_value = mock_query_response
 
@@ -88,17 +94,21 @@ class TestVelociraptorClient:
 
         # Mock VQL query response for client search
         mock_query_response = Mock()
-        mock_query_response.Response = json.dumps([{
-            "client_id": "C.1234567890",
-            "FirstSeen": "2023-01-01T00:00:00Z",
-            "LastSeen": "2023-01-02T00:00:00Z",
-            "Hostname": "test-host",
-            "Fqdn": "test-host.domain.com",
-            "OSType": "Linux",
-            "OS": "Ubuntu 20.04",
-            "Machine": "x86_64",
-            "AgentVersion": "0.72.0"
-        }])
+        mock_query_response.Response = json.dumps(
+            [
+                {
+                    "client_id": "C.1234567890",
+                    "FirstSeen": "2023-01-01T00:00:00Z",
+                    "LastSeen": "2023-01-02T00:00:00Z",
+                    "Hostname": "test-host",
+                    "Fqdn": "test-host.domain.com",
+                    "OSType": "Linux",
+                    "OS": "Ubuntu 20.04",
+                    "Machine": "x86_64",
+                    "AgentVersion": "0.72.0",
+                },
+            ],
+        )
 
         mock_grpc_client.Query.return_value = mock_query_response
 
@@ -131,10 +141,9 @@ class TestVelociraptorClient:
 
         # Mock collection start response
         mock_query_response = Mock()
-        mock_query_response.Response = json.dumps([{
-            "flow_id": "F.1234567890",
-            "status": "RUNNING"
-        }])
+        mock_query_response.Response = json.dumps(
+            [{"flow_id": "F.1234567890", "status": "RUNNING"}],
+        )
 
         mock_grpc_client.Query.return_value = mock_query_response
 
