@@ -202,18 +202,14 @@ class TestVelociraptorMCPServer:
         tools = await server.app.get_tools()
         authenticate_tool = tools["AuthenticateTool"]
 
-        # Mock arguments
-        from velociraptor_mcp_server.server import AuthenticateArgs
-
-        args = AuthenticateArgs()
-
         # Execute the tool
-        result = await authenticate_tool.run(args)
+        result = await authenticate_tool.run({"args": {}})
 
-        # Verify result
-        assert len(result) == 1
-        assert result[0]["type"] == "text"
-        assert "Authentication successful" in result[0]["text"]
+        # Verify result - ToolResult object
+        assert hasattr(result, 'content')
+        assert len(result.content) == 1
+        assert hasattr(result.content[0], 'text')
+        assert "Authentication successful" in result.content[0].text
         mock_client.authenticate.assert_called_once()
 
     @pytest.mark.asyncio
@@ -238,19 +234,15 @@ class TestVelociraptorMCPServer:
         tools = await server.app.get_tools()
         get_agent_info_tool = tools["GetAgentInfo"]
 
-        # Mock arguments
-        from velociraptor_mcp_server.server import GetAgentInfoArgs
-
-        args = GetAgentInfoArgs(hostname="test-host")
-
         # Execute the tool
-        result = await get_agent_info_tool.run(args)
+        result = await get_agent_info_tool.run({"args": {"hostname": "test-host"}})
 
-        # Verify result
-        assert len(result) == 1
-        assert result[0]["type"] == "text"
-        assert "Client information for 'test-host'" in result[0]["text"]
-        assert "C.1234567890" in result[0]["text"]
+        # Verify result - ToolResult object
+        assert hasattr(result, 'content')
+        assert len(result.content) == 1
+        assert hasattr(result.content[0], 'text')
+        assert "Client information for 'test-host'" in result.content[0].text
+        assert "C.1234567890" in result.content[0].text
         mock_client.find_client_info.assert_called_once_with("test-host")
 
     @pytest.mark.asyncio
@@ -269,18 +261,14 @@ class TestVelociraptorMCPServer:
         tools = await server.app.get_tools()
         get_agent_info_tool = tools["GetAgentInfo"]
 
-        # Mock arguments
-        from velociraptor_mcp_server.server import GetAgentInfoArgs
-
-        args = GetAgentInfoArgs(hostname="nonexistent-host")
-
         # Execute the tool
-        result = await get_agent_info_tool.run(args)
+        result = await get_agent_info_tool.run({"args": {"hostname": "nonexistent-host"}})
 
-        # Verify result
-        assert len(result) == 1
-        assert result[0]["type"] == "text"
-        assert "No client found with hostname: nonexistent-host" in result[0]["text"]
+        # Verify result - ToolResult object
+        assert hasattr(result, 'content')
+        assert len(result.content) == 1
+        assert hasattr(result.content[0], 'text')
+        assert "No client found with hostname: nonexistent-host" in result.content[0].text
         mock_client.find_client_info.assert_called_once_with("nonexistent-host")
 
     @pytest.mark.asyncio
@@ -304,18 +292,17 @@ class TestVelociraptorMCPServer:
         tools = await server.app.get_tools()
         run_vql_query_tool = tools["RunVQLQueryTool"]
 
-        # Mock arguments
-        from velociraptor_mcp_server.server import RunVQLQueryArgs
-
-        args = RunVQLQueryArgs(vql="SELECT * FROM clients() LIMIT 10")
-
         # Execute the tool
-        result = await run_vql_query_tool(args)
+        result = await run_vql_query_tool.run({"args": {"vql": "SELECT * FROM clients() LIMIT 10"}})
 
-        # Verify result
-        assert len(result) == 1
-        assert result[0]["type"] == "text"
-        result_data = json.loads(result[0]["text"])
+        # Verify result - ToolResult object
+        assert hasattr(result, 'content')
+        assert len(result.content) == 1
+        assert hasattr(result.content[0], 'text')
+        # The result.content[0].text contains a JSON array with one element that has the actual data
+        outer_data = json.loads(result.content[0].text)
+        assert len(outer_data) == 1
+        result_data = json.loads(outer_data[0]["text"])
         assert len(result_data) == 2
         assert result_data[0]["client_id"] == "C.1234567890"
         mock_client.run_vql_query.assert_called_once_with("SELECT * FROM clients() LIMIT 10")
@@ -350,12 +337,16 @@ class TestVelociraptorMCPServer:
         list_linux_artifacts_tool = tools["ListLinuxArtifactsTool"]
 
         # Execute the tool
-        result = await list_linux_artifacts_tool.run({})
+        result = await list_linux_artifacts_tool.run({"args": {}})
 
-        # Verify result
-        assert len(result) == 1
-        assert result[0]["type"] == "text"
-        response_data = json.loads(result[0]["text"])
+        # Verify result - ToolResult object
+        assert hasattr(result, 'content')
+        assert len(result.content) == 1
+        assert hasattr(result.content[0], 'text')
+        # The result.content[0].text contains a JSON array with one element that has the actual data
+        outer_data = json.loads(result.content[0].text)
+        assert len(outer_data) == 1
+        response_data = json.loads(outer_data[0]["text"])
 
         # Check that we have the expected artifacts
         assert len(response_data) == 2
@@ -402,18 +393,17 @@ class TestVelociraptorMCPServer:
         tools = await server.app.get_tools()
         list_windows_artifacts_tool = tools["ListWindowsArtifactsTool"]
 
-        # Mock arguments
-        from velociraptor_mcp_server.server import ListWindowsArtifactsArgs
-
-        args = ListWindowsArtifactsArgs()
-
         # Execute the tool
-        result = await list_windows_artifacts_tool.run(args)
+        result = await list_windows_artifacts_tool.run({"args": {}})
 
-        # Verify result
-        assert len(result) == 1
-        assert result[0]["type"] == "text"
-        response_data = json.loads(result[0]["text"])
+        # Verify result - ToolResult object
+        assert hasattr(result, 'content')
+        assert len(result.content) == 1
+        assert hasattr(result.content[0], 'text')
+        # The result.content[0].text contains a JSON array with one element that has the actual data
+        outer_data = json.loads(result.content[0].text)
+        assert len(outer_data) == 1
+        response_data = json.loads(outer_data[0]["text"])
 
         # Check that we have the expected artifacts
         assert len(response_data) == 2
@@ -437,17 +427,19 @@ class TestCreateServer:
 
     def test_create_server_with_config(self, config):
         """Test create_server with provided config."""
-        server = create_server(config)
+        with patch("os.path.exists", return_value=True):
+            server = create_server(config)
 
-        assert isinstance(server, VelociraptorMCPServer)
-        assert server.config == config
+            assert isinstance(server, VelociraptorMCPServer)
+            assert server.config == config
 
     @patch("velociraptor_mcp_server.server.Config.from_env")
     def test_create_server_without_config(self, mock_from_env, config):
         """Test create_server without config (uses env)."""
         mock_from_env.return_value = config
 
-        server = create_server()
+        with patch("os.path.exists", return_value=True):
+            server = create_server()
 
-        assert isinstance(server, VelociraptorMCPServer)
-        mock_from_env.assert_called_once()
+            assert isinstance(server, VelociraptorMCPServer)
+            mock_from_env.assert_called_once()
