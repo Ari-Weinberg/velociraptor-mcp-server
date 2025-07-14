@@ -12,7 +12,10 @@ from velociraptor_mcp_server.server import VelociraptorMCPServer, create_server
 
 
 class TestVelociraptorMCPServer:
-    """Test Velociraptor MCP server."""
+    """        args = RunVQLQueryArgs(vql="SELECT * FROM clients() LIMIT 5")
+
+        # Execute the tool
+        result = await run_vql_query_tool.run(args) Velociraptor MCP server."""
 
     def test_init(self, config):
         """Test VelociraptorMCPServer initialization."""
@@ -142,6 +145,48 @@ class TestVelociraptorMCPServer:
         assert "RunVQLQueryTool" not in tool_names
 
     @pytest.mark.asyncio
+    async def test_list_linux_artifacts_tool_registration(self, config):
+        """Test that ListLinuxArtifactsTool is registered when not disabled."""
+        server = VelociraptorMCPServer(config)
+
+        # Check that the tool is registered
+        tools = await server.app.get_tools()
+        tool_names = list(tools.keys())
+        assert "ListLinuxArtifactsTool" in tool_names
+
+    @pytest.mark.asyncio
+    async def test_list_linux_artifacts_tool_disabled(self, config):
+        """Test that ListLinuxArtifactsTool is not registered when disabled."""
+        config.server.disabled_tools = ["ListLinuxArtifactsTool"]
+        server = VelociraptorMCPServer(config)
+
+        # Check that the tool is not registered
+        tools = await server.app.get_tools()
+        tool_names = list(tools.keys())
+        assert "ListLinuxArtifactsTool" not in tool_names
+
+    @pytest.mark.asyncio
+    async def test_list_windows_artifacts_tool_registration(self, config):
+        """Test that ListWindowsArtifactsTool is registered when not disabled."""
+        server = VelociraptorMCPServer(config)
+
+        # Check that the tool is registered
+        tools = await server.app.get_tools()
+        tool_names = list(tools.keys())
+        assert "ListWindowsArtifactsTool" in tool_names
+
+    @pytest.mark.asyncio
+    async def test_list_windows_artifacts_tool_disabled(self, config):
+        """Test that ListWindowsArtifactsTool is not registered when disabled."""
+        config.server.disabled_tools = ["ListWindowsArtifactsTool"]
+        server = VelociraptorMCPServer(config)
+
+        # Check that the tool is not registered
+        tools = await server.app.get_tools()
+        tool_names = list(tools.keys())
+        assert "ListWindowsArtifactsTool" not in tool_names
+
+    @pytest.mark.asyncio
     async def test_authenticate_tool_execution(self, config):
         """Test AuthenticateTool execution."""
         server = VelociraptorMCPServer(config)
@@ -163,7 +208,7 @@ class TestVelociraptorMCPServer:
         args = AuthenticateArgs()
 
         # Execute the tool
-        result = await authenticate_tool(args)
+        result = await authenticate_tool.run(args)
 
         # Verify result
         assert len(result) == 1
@@ -199,7 +244,7 @@ class TestVelociraptorMCPServer:
         args = GetAgentInfoArgs(hostname="test-host")
 
         # Execute the tool
-        result = await get_agent_info_tool(args)
+        result = await get_agent_info_tool.run(args)
 
         # Verify result
         assert len(result) == 1
@@ -230,7 +275,7 @@ class TestVelociraptorMCPServer:
         args = GetAgentInfoArgs(hostname="nonexistent-host")
 
         # Execute the tool
-        result = await get_agent_info_tool(args)
+        result = await get_agent_info_tool.run(args)
 
         # Verify result
         assert len(result) == 1
@@ -274,6 +319,117 @@ class TestVelociraptorMCPServer:
         assert len(result_data) == 2
         assert result_data[0]["client_id"] == "C.1234567890"
         mock_client.run_vql_query.assert_called_once_with("SELECT * FROM clients() LIMIT 10")
+
+    @pytest.mark.asyncio
+    async def test_list_linux_artifacts_tool_execution(self, config):
+        """Test ListLinuxArtifactsTool execution."""
+        server = VelociraptorMCPServer(config)
+
+        # Mock the client
+        mock_client = Mock()
+        mock_client.stub = Mock()  # Simulate authenticated client
+        mock_client.authenticate = AsyncMock()
+        mock_client.run_vql_query = Mock(
+            return_value=[
+                {
+                    "name": "Linux.System.Info",
+                    "description": "Gather basic system information from a Linux system. This includes OS version, kernel info, and hardware details.",
+                    "parameters": [{"name": "param1"}, {"name": "param2"}],
+                },
+                {
+                    "name": "Linux.Network.Netstat",
+                    "description": "Parse netstat output to show network connections and listening ports.",
+                    "parameters": [{"name": "connection_type"}],
+                },
+            ]
+        )
+        server._client = mock_client
+
+        # Get the tool and execute it
+        tools = await server.app.get_tools()
+        list_linux_artifacts_tool = tools["ListLinuxArtifactsTool"]
+
+        # Execute the tool
+        result = await list_linux_artifacts_tool.run({})
+
+        # Verify result
+        assert len(result) == 1
+        assert result[0]["type"] == "text"
+        response_data = json.loads(result[0]["text"])
+
+        # Check that we have the expected artifacts
+        assert len(response_data) == 2
+        assert response_data[0]["name"] == "Linux.System.Info"
+        assert "Gather basic system information" in response_data[0]["short_description"]
+        assert response_data[0]["parameters"] == ["param1", "param2"]
+
+        assert response_data[1]["name"] == "Linux.Network.Netstat"
+        assert "Parse netstat output" in response_data[1]["short_description"]
+        assert response_data[1]["parameters"] == ["connection_type"]
+
+        # Verify the VQL query was called
+        mock_client.run_vql_query.assert_called_once()
+        called_vql = mock_client.run_vql_query.call_args[0][0]
+        assert "artifact_definitions()" in called_vql
+        assert "linux\\." in called_vql
+
+    @pytest.mark.asyncio
+    async def test_list_windows_artifacts_tool_execution(self, config):
+        """Test ListWindowsArtifactsTool execution."""
+        server = VelociraptorMCPServer(config)
+
+        # Mock the client
+        mock_client = Mock()
+        mock_client.stub = Mock()  # Simulate authenticated client
+        mock_client.authenticate = AsyncMock()
+        mock_client.run_vql_query = Mock(
+            return_value=[
+                {
+                    "name": "Windows.System.Services",
+                    "description": "List all installed Windows services with their configuration and status. This includes service name, display name, and current state.",
+                    "parameters": [{"name": "service_name"}, {"name": "status_filter"}],
+                },
+                {
+                    "name": "Windows.Registry.NTUser",
+                    "description": "Parse NTUSER.DAT registry hive files to extract user-specific registry keys.",
+                    "parameters": [{"name": "key_path"}],
+                },
+            ]
+        )
+        server._client = mock_client
+
+        # Get the tool and execute it
+        tools = await server.app.get_tools()
+        list_windows_artifacts_tool = tools["ListWindowsArtifactsTool"]
+
+        # Mock arguments
+        from velociraptor_mcp_server.server import ListWindowsArtifactsArgs
+
+        args = ListWindowsArtifactsArgs()
+
+        # Execute the tool
+        result = await list_windows_artifacts_tool.run(args)
+
+        # Verify result
+        assert len(result) == 1
+        assert result[0]["type"] == "text"
+        response_data = json.loads(result[0]["text"])
+
+        # Check that we have the expected artifacts
+        assert len(response_data) == 2
+        assert response_data[0]["name"] == "Windows.System.Services"
+        assert "List all installed Windows services" in response_data[0]["short_description"]
+        assert response_data[0]["parameters"] == ["service_name", "status_filter"]
+
+        assert response_data[1]["name"] == "Windows.Registry.NTUser"
+        assert "Parse NTUSER" in response_data[1]["short_description"]
+        assert response_data[1]["parameters"] == ["key_path"]
+
+        # Verify the VQL query was called
+        mock_client.run_vql_query.assert_called_once()
+        called_vql = mock_client.run_vql_query.call_args[0][0]
+        assert "artifact_definitions()" in called_vql
+        assert "^windows\\." in called_vql
 
 
 class TestCreateServer:

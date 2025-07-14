@@ -42,7 +42,7 @@ async def main():
     print("\n=== Testing Get Agents ===")
     await agent.ainvoke(
         {
-            "input": "Give me the client details for the piHole client.",
+            "input": "What are some artifacts I can use for the piHole agent based on its OS?",
         },
     )
 
