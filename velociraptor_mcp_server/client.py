@@ -141,6 +141,7 @@ class VelociraptorClient:
             raise RuntimeError("Stub not initialized. Call authenticate() first.")
 
         try:
+            logger.info("Executing VQL query: %s", vql)
             request = api_pb2.VQLCollectorArgs(Query=[api_pb2.VQLRequest(VQL=vql)])
             results = []
 
@@ -235,10 +236,15 @@ class VelociraptorClient:
             f"LIMIT 100"
         )
 
-        results = self.run_vql_query(vql)
-        if results and isinstance(results, list) and len(results) > 0:
-            return "FINISHED"
-        return "RUNNING"
+        try:
+            results = self.run_vql_query(vql)
+            logger.info("Flow status query results: %s", results)
+            if results and isinstance(results, list) and len(results) > 0:
+                return "FINISHED"
+            return "RUNNING"
+        except Exception as e:
+            logger.error("Error checking flow status: %s", e)
+            return "ERROR"
 
     def get_flow_results(
         self,

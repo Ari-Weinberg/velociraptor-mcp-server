@@ -2,6 +2,7 @@
 Main MCP server implementation.
 """
 
+import asyncio
 import json
 import logging
 from typing import Optional
@@ -54,6 +55,17 @@ class CollectArtifactArgs(BaseModel):
     client_id: str = Field(..., description="Velociraptor client ID to target for collection")
     artifact: str = Field(..., description="Name of the Velociraptor artifact to collect")
     parameters: str = Field("", description="Comma-separated string of key='value' pairs to pass to the artifact")
+
+
+class GetCollectionResultsArgs(BaseModel):
+    """Arguments for getting collection results."""
+
+    client_id: str = Field(..., description="Velociraptor client ID where the collection was run")
+    flow_id: str = Field(..., description="Flow ID returned from the initial collection")
+    artifact: str = Field(..., description="Name of the artifact collected (e.g., Windows.NTFS.MFT)")
+    fields: str = Field("*", description="Comma-separated string of fields to return (default is '*')")
+    max_retries: int = Field(10, description="Number of times to retry if the flow hasn't finished")
+    retry_delay: int = Field(30, description="Time in seconds to wait between retries")
 
 
 class VelociraptorMCPServer:
@@ -398,6 +410,101 @@ class VelociraptorMCPServer:
                 except Exception as e:
                     logger.error("Failed to collect artifact: %s", e)
                     return [{"type": "text", "text": f"Error collecting artifact: {str(e)}"}]
+
+        if "GetCollectionResultsTool" not in self.config.server.disabled_tools:
+
+            @self.app.tool(
+                name="GetCollectionResultsTool",
+                description="Retrieve Velociraptor collection results for a given client, flow ID, and artifact. This tool waits and retries if the flow hasn't finished or if no results are immediately available. Use this after starting a collection with CollectArtifactTool.",
+            )
+            async def get_collection_results_tool(args: GetCollectionResultsArgs):
+                """Retrieve Velociraptor collection results for a given client, flow ID, and artifact.
+
+                This tool retrieves results from a previously started collection. It will wait and retry
+                if the flow hasn't finished or if no results are immediately available. This is typically
+                used after starting a collection with CollectArtifactTool.
+
+                Args:
+                    args: An object containing:
+                        - client_id (required): Velociraptor client ID where the collection was run
+                        - flow_id (required): Flow ID returned from the initial collection
+                        - artifact (required): Name of the artifact collected (e.g., Windows.NTFS.MFT)
+                        - fields (optional): Comma-separated string of fields to return (default is '*')
+                        - max_retries (optional): Number of times to retry if the flow hasn't finished (default: 10)
+                        - retry_delay (optional): Time in seconds to wait between retries (default: 30)
+
+                Example usage:
+                    {"args": {"client_id": "C.1234567890", "flow_id": "F.ABC123", "artifact": "Windows.System.Users"}}
+                    {"args": {"client_id": "C.0987654321", "flow_id": "F.DEF456", "artifact": "Linux.System.Uptime", "fields": "Uptime,BootTime"}}
+
+                Returns:
+                    JSON array of collection results or status message if still running/failed.
+                """
+                try:
+                    client = self._get_client()
+
+                    # Ensure client is authenticated
+                    if client.stub is None:
+                        await client.authenticate()
+
+                    # Retry logic to wait for collection completion
+                    for attempt in range(args.max_retries):
+                        logger.info(
+                            "Checking collection status (attempt %d/%d) for flow %s",
+                            attempt + 1,
+                            args.max_retries,
+                            args.flow_id,
+                        )
+
+                        # Check flow status
+                        status = client.get_flow_status(args.client_id, args.flow_id, args.artifact)
+
+                        logger.info("Flow status: %s", status)
+
+                        if status == "FINISHED":
+                            # Get the results
+                            results = client.get_flow_results(
+                                args.client_id,
+                                args.flow_id,
+                                args.artifact,
+                                args.fields,
+                            )
+
+                            if results:
+                                # Format the response
+                                response_text = json.dumps(results, indent=2)
+                                return [
+                                    {
+                                        "type": "text",
+                                        "text": f"Collection results for flow {args.flow_id}:\n{self._safe_truncate(response_text)}",
+                                    },
+                                ]
+                            else:
+                                return [
+                                    {
+                                        "type": "text",
+                                        "text": f"Flow {args.flow_id} completed but no results were found for artifact {args.artifact}",
+                                    },
+                                ]
+
+                        # If not finished, wait before retrying (except on last attempt)
+                        if attempt < args.max_retries - 1:
+                            logger.info("Flow not finished, waiting %d seconds before retry", args.retry_delay)
+                            await asyncio.sleep(args.retry_delay)
+
+                    # If we've exhausted retries
+                    return [
+                        {
+                            "type": "text",
+                            "text": f"Collection results not available after {args.max_retries} retries. "
+                            f"Flow {args.flow_id} may still be running or may have failed. "
+                            f"Try again later or check the Velociraptor UI for flow status.",
+                        },
+                    ]
+
+                except Exception as e:
+                    logger.error("Failed to get collection results: %s", e)
+                    return [{"type": "text", "text": f"Error getting collection results: {str(e)}"}]
 
     def _safe_truncate(self, text: str, max_length: int = 32000) -> str:
         """Truncate text to avoid overwhelming the client."""

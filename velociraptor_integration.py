@@ -42,7 +42,7 @@ async def main():
     print("\n=== Testing Get Agents ===")
     await agent.ainvoke(
         {
-            "input": "Collect the Linux.Debian.Packages of the piHole agent.",
+            "input": "Collect the Linux.Sys.Users of the piHole agent.",
         },
     )
 
