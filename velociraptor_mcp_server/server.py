@@ -48,6 +48,14 @@ class ListWindowsArtifactsArgs(BaseModel):
     pass
 
 
+class CollectArtifactArgs(BaseModel):
+    """Arguments for collecting artifacts from a client."""
+
+    client_id: str = Field(..., description="Velociraptor client ID to target for collection")
+    artifact: str = Field(..., description="Name of the Velociraptor artifact to collect")
+    parameters: str = Field("", description="Comma-separated string of key='value' pairs to pass to the artifact")
+
+
 class VelociraptorMCPServer:
     """Main MCP server for Velociraptor integration."""
 
@@ -333,11 +341,69 @@ class VelociraptorMCPServer:
                     logger.error("Failed to list Windows artifacts: %s", e)
                     return [{"type": "text", "text": f"Error listing Windows artifacts: {str(e)}"}]
 
+        if "CollectArtifactTool" not in self.config.server.disabled_tools:
+
+            @self.app.tool(
+                name="CollectArtifactTool",
+                description="Collect a Velociraptor artifact from a client. This tool allows you to collect specific artifacts from a target client by specifying the client ID and artifact name. Optionally, you can provide parameters for the artifact collection.",
+            )
+            async def collect_artifact_tool(args: CollectArtifactArgs):
+                """Collect a Velociraptor artifact from a client.
+
+                This tool collects a specific artifact from a target client. You must provide
+                the client ID and artifact name. Optionally, you can provide parameters for
+                the artifact collection in the form of key='value' pairs.
+
+                Args:
+                    args: An object containing:
+                        - client_id (required): Velociraptor client ID to target for collection
+                        - artifact (required): Name of the Velociraptor artifact to collect
+                        - parameters (optional): Comma-separated string of key='value' pairs
+
+                Example usage:
+                    {"args": {"client_id": "C.1234567890", "artifact": "Windows.System.Users"}}
+                    {"args": {"client_id": "C.0987654321", "artifact": "Linux.System.Uptime", "parameters": "format='seconds'"}}
+
+                Returns:
+                    JSON object with collection information including flow_id and status.
+                """
+                try:
+                    client = self._get_client()
+
+                    # Ensure client is authenticated
+                    if client.stub is None:
+                        await client.authenticate()
+
+                    # Start the collection using the client's start_collection method
+                    response = client.start_collection(args.client_id, args.artifact, args.parameters)
+
+                    # Ensure the response contains the flow ID
+                    if not isinstance(response, list) or not response or "flow_id" not in response[0]:
+                        return [
+                            {
+                                "type": "text",
+                                "text": f"Failed to start collection: {json.dumps(response, indent=2)}",
+                            },
+                        ]
+
+                    # Format the response
+                    response_text = json.dumps(response[0], indent=2)
+
+                    return [
+                        {
+                            "type": "text",
+                            "text": f"Collection started successfully:\n{response_text}",
+                        },
+                    ]
+                except Exception as e:
+                    logger.error("Failed to collect artifact: %s", e)
+                    return [{"type": "text", "text": f"Error collecting artifact: {str(e)}"}]
+
     def _safe_truncate(self, text: str, max_length: int = 32000) -> str:
         """Truncate text to avoid overwhelming the client."""
         if len(text) <= max_length:
             return text
-        return text[:max_length] + f"\\n\\n[... truncated {len(text) - max_length} characters ...]"
+        return text[:max_length] + f"\n\n[... truncated {len(text) - max_length} characters ...]"
 
     def _normalize_args(self, raw_args, model_class):
         """Normalize arguments to handle both direct and wrapped formats."""

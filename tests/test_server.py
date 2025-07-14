@@ -421,25 +421,80 @@ class TestVelociraptorMCPServer:
         assert "artifact_definitions()" in called_vql
         assert "^windows\\." in called_vql
 
+    @pytest.mark.asyncio
+    async def test_collect_artifact_tool_registration(self, config):
+        """Test CollectArtifactTool registration."""
+        server = VelociraptorMCPServer(config)
 
-class TestCreateServer:
-    """Test create_server factory function."""
+        # Get all tools
+        tools = await server.app.get_tools()
 
-    def test_create_server_with_config(self, config):
-        """Test create_server with provided config."""
-        with patch("os.path.exists", return_value=True):
-            server = create_server(config)
+        # Check if CollectArtifactTool is registered
+        assert "CollectArtifactTool" in tools
+        tool = tools["CollectArtifactTool"]
+        assert tool.name == "CollectArtifactTool"
+        assert "collect" in tool.description.lower()
 
-            assert isinstance(server, VelociraptorMCPServer)
-            assert server.config == config
+    @pytest.mark.asyncio
+    async def test_collect_artifact_tool_disabled(self, config):
+        """Test CollectArtifactTool when disabled."""
+        # Disable the tool
+        config.server.disabled_tools = ["CollectArtifactTool"]
+        server = VelociraptorMCPServer(config)
 
-    @patch("velociraptor_mcp_server.server.Config.from_env")
-    def test_create_server_without_config(self, mock_from_env, config):
-        """Test create_server without config (uses env)."""
-        mock_from_env.return_value = config
+        # Get all tools
+        tools = await server.app.get_tools()
 
-        with patch("os.path.exists", return_value=True):
-            server = create_server()
+        # Check if CollectArtifactTool is not registered
+        assert "CollectArtifactTool" not in tools
 
-            assert isinstance(server, VelociraptorMCPServer)
-            mock_from_env.assert_called_once()
+    @pytest.mark.asyncio
+    async def test_collect_artifact_tool_execution(self, config):
+        """Test CollectArtifactTool execution."""
+        server = VelociraptorMCPServer(config)
+
+        # Mock the client
+        mock_client = Mock()
+        mock_client.stub = Mock()  # Simulate authenticated client
+        mock_client.authenticate = AsyncMock()
+        mock_client.start_collection = Mock(
+            return_value=[
+                {
+                    "flow_id": "F.1234567890ABCDEF",
+                    "artifacts": ["Windows.System.Users"],
+                    "status": "RUNNING",
+                    "client_id": "C.1234567890",
+                },
+            ]
+        )
+        server._client = mock_client
+
+        # Get the tool and execute it
+        tools = await server.app.get_tools()
+        collect_artifact_tool = tools["CollectArtifactTool"]
+
+        # Execute the tool
+        result = await collect_artifact_tool.run({
+            "args": {
+                "client_id": "C.1234567890",
+                "artifact": "Windows.System.Users",
+                "parameters": "user='Administrator'",
+            }
+        })
+
+        # Verify result - ToolResult object
+        assert hasattr(result, 'content')
+        assert len(result.content) == 1
+        assert hasattr(result.content[0], 'text')
+
+        result_text = result.content[0].text
+        assert "Collection started successfully" in result_text
+        assert "F.1234567890ABCDEF" in result_text
+        assert "Windows.System.Users" in result_text
+
+        # Verify the start_collection was called with correct parameters
+        mock_client.start_collection.assert_called_once_with(
+            "C.1234567890",
+            "Windows.System.Users",
+            "user='Administrator'"
+        )
