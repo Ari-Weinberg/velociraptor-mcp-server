@@ -31,7 +31,7 @@ class VelociraptorConfig:
         if not self.api_key:
             raise ValueError("Velociraptor API key/config path is required")
         # If api_key looks like a file path, validate it exists
-        if self.api_key.endswith('.yaml') or self.api_key.endswith('.yml'):
+        if self.api_key.endswith(".yaml") or self.api_key.endswith(".yml"):
             if not os.path.exists(self.api_key):
                 raise ValueError(f"Velociraptor API config file not found: {self.api_key}")
 

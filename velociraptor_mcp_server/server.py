@@ -4,7 +4,7 @@ Main MCP server implementation.
 
 import json
 import logging
-from typing import List, Optional
+from typing import Optional
 
 from fastmcp import FastMCP
 from pydantic import BaseModel, Field
@@ -124,7 +124,7 @@ class VelociraptorMCPServer:
                             {
                                 "type": "text",
                                 "text": f"No client found with hostname: {args.hostname}",
-                            }
+                            },
                         ]
 
                     # Format the response

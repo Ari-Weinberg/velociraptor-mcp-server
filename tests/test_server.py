@@ -8,24 +8,24 @@ from unittest.mock import AsyncMock, Mock, patch
 import pytest
 
 from velociraptor_mcp_server.config import Config
-from velociraptor_mcp_server.server import WazuhMCPServer, create_server
+from velociraptor_mcp_server.server import VelociraptorMCPServer, create_server
 
 
-class TestWazuhMCPServer:
-    """Test Wazuh MCP server."""
+class TestVelociraptorMCPServer:
+    """Test Velociraptor MCP server."""
 
     def test_init(self, config):
-        """Test WazuhMCPServer initialization."""
-        server = WazuhMCPServer(config)
+        """Test VelociraptorMCPServer initialization."""
+        server = VelociraptorMCPServer(config)
 
         assert server.config == config
         assert server._client is None
         assert server.app is not None
-        assert server.app.name == "Wazuh MCP Server"
+        assert server.app.name == "Velociraptor MCP Server"
 
     def test_get_client(self, config):
         """Test _get_client method."""
-        server = WazuhMCPServer(config)
+        server = VelociraptorMCPServer(config)
 
         # First call should create client
         client1 = server._get_client()
@@ -38,7 +38,7 @@ class TestWazuhMCPServer:
 
     def test_safe_truncate_short_text(self, config):
         """Test _safe_truncate with short text."""
-        server = WazuhMCPServer(config)
+        server = VelociraptorMCPServer(config)
 
         short_text = "This is a short text"
         result = server._safe_truncate(short_text)
@@ -47,7 +47,7 @@ class TestWazuhMCPServer:
 
     def test_safe_truncate_long_text(self, config):
         """Test _safe_truncate with long text."""
-        server = WazuhMCPServer(config)
+        server = VelociraptorMCPServer(config)
 
         long_text = "A" * 50000  # 50k characters
         result = server._safe_truncate(long_text, max_length=1000)
@@ -59,7 +59,7 @@ class TestWazuhMCPServer:
     @pytest.mark.asyncio
     async def test_close(self, config):
         """Test server close method."""
-        server = WazuhMCPServer(config)
+        server = VelociraptorMCPServer(config)
 
         # Mock client
         mock_client = Mock()
@@ -73,157 +73,207 @@ class TestWazuhMCPServer:
     @pytest.mark.asyncio
     async def test_close_no_client(self, config):
         """Test server close method with no client."""
-        server = WazuhMCPServer(config)
+        server = VelociraptorMCPServer(config)
 
         # Should not raise an exception
         await server.close()
 
     @pytest.mark.asyncio
-    async def test_get_agent_ports_tool_registration(self, config):
-        """Test that GetAgentPortsTool is registered when not disabled."""
-        server = WazuhMCPServer(config)
+    async def test_authenticate_tool_registration(self, config):
+        """Test that AuthenticateTool is registered when not disabled."""
+        server = VelociraptorMCPServer(config)
 
         # Check that the tool is registered
         tools = await server.app.get_tools()
         tool_names = list(tools.keys())
-        assert "GetAgentPortsTool" in tool_names
+        assert "AuthenticateTool" in tool_names
 
     @pytest.mark.asyncio
-    async def test_get_agent_ports_tool_disabled(self, config):
-        """Test that GetAgentPortsTool is not registered when disabled."""
-        config.server.disabled_tools = ["GetAgentPortsTool"]
-        server = WazuhMCPServer(config)
+    async def test_authenticate_tool_disabled(self, config):
+        """Test that AuthenticateTool is not registered when disabled."""
+        config.server.disabled_tools = ["AuthenticateTool"]
+        server = VelociraptorMCPServer(config)
 
         # Check that the tool is not registered
         tools = await server.app.get_tools()
         tool_names = list(tools.keys())
-        assert "GetAgentPortsTool" not in tool_names
+        assert "AuthenticateTool" not in tool_names
 
     @pytest.mark.asyncio
-    async def test_get_agent_packages_tool_registration(self, config):
-        """Test that GetAgentPackagesTool is registered when not disabled."""
-        server = WazuhMCPServer(config)
+    async def test_get_agent_info_tool_registration(self, config):
+        """Test that GetAgentInfo is registered when not disabled."""
+        server = VelociraptorMCPServer(config)
 
         # Check that the tool is registered
         tools = await server.app.get_tools()
         tool_names = list(tools.keys())
-        assert "GetAgentPackagesTool" in tool_names
+        assert "GetAgentInfo" in tool_names
 
     @pytest.mark.asyncio
-    async def test_get_agent_packages_tool_disabled(self, config):
-        """Test that GetAgentPackagesTool is not registered when disabled."""
-        config.server.disabled_tools = ["GetAgentPackagesTool"]
-        server = WazuhMCPServer(config)
+    async def test_get_agent_info_tool_disabled(self, config):
+        """Test that GetAgentInfo is not registered when disabled."""
+        config.server.disabled_tools = ["GetAgentInfo"]
+        server = VelociraptorMCPServer(config)
 
         # Check that the tool is not registered
         tools = await server.app.get_tools()
         tool_names = list(tools.keys())
-        assert "GetAgentPackagesTool" not in tool_names
+        assert "GetAgentInfo" not in tool_names
 
     @pytest.mark.asyncio
-    async def test_get_agent_processes_tool_registration(self, config):
-        """Test that GetAgentProcessesTool is registered when not disabled."""
-        server = WazuhMCPServer(config)
+    async def test_run_vql_query_tool_registration(self, config):
+        """Test that RunVQLQueryTool is registered when not disabled."""
+        server = VelociraptorMCPServer(config)
 
         # Check that the tool is registered
         tools = await server.app.get_tools()
         tool_names = list(tools.keys())
-        assert "GetAgentProcessesTool" in tool_names
+        assert "RunVQLQueryTool" in tool_names
 
     @pytest.mark.asyncio
-    async def test_get_agent_processes_tool_disabled(self, config):
-        """Test that GetAgentProcessesTool is not registered when disabled."""
-        config.server.disabled_tools = ["GetAgentProcessesTool"]
-        server = WazuhMCPServer(config)
+    async def test_run_vql_query_tool_disabled(self, config):
+        """Test that RunVQLQueryTool is not registered when disabled."""
+        config.server.disabled_tools = ["RunVQLQueryTool"]
+        server = VelociraptorMCPServer(config)
 
         # Check that the tool is not registered
         tools = await server.app.get_tools()
         tool_names = list(tools.keys())
-        assert "GetAgentProcessesTool" not in tool_names
+        assert "RunVQLQueryTool" not in tool_names
 
     @pytest.mark.asyncio
-    async def test_list_rules_tool_registration(self, config):
-        """Test that ListRulesTool is registered when not disabled."""
-        server = WazuhMCPServer(config)
+    async def test_authenticate_tool_execution(self, config):
+        """Test AuthenticateTool execution."""
+        server = VelociraptorMCPServer(config)
 
-        # Check that the tool is registered
+        # Mock the client
+        mock_client = Mock()
+        mock_client.authenticate = AsyncMock(
+            return_value={"status": "authenticated", "user": "test_user"},
+        )
+        server._client = mock_client
+
+        # Get the tool and execute it
         tools = await server.app.get_tools()
-        tool_names = list(tools.keys())
-        assert "ListRulesTool" in tool_names
+        authenticate_tool = tools["AuthenticateTool"]
+
+        # Mock arguments
+        from velociraptor_mcp_server.server import AuthenticateArgs
+
+        args = AuthenticateArgs()
+
+        # Execute the tool
+        result = await authenticate_tool(args)
+
+        # Verify result
+        assert len(result) == 1
+        assert result[0]["type"] == "text"
+        assert "Authentication successful" in result[0]["text"]
+        mock_client.authenticate.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_list_rules_tool_disabled(self, config):
-        """Test that ListRulesTool is not registered when disabled."""
-        config.server.disabled_tools = ["ListRulesTool"]
-        server = WazuhMCPServer(config)
+    async def test_get_agent_info_tool_execution_success(self, config):
+        """Test GetAgentInfo execution with successful result."""
+        server = VelociraptorMCPServer(config)
 
-        # Check that the tool is not registered
+        # Mock the client
+        mock_client = Mock()
+        mock_client.stub = Mock()  # Simulate authenticated client
+        mock_client.authenticate = AsyncMock()
+        mock_client.find_client_info = Mock(
+            return_value={
+                "client_id": "C.1234567890",
+                "hostname": "test-host",
+                "os_info": {"system": "Linux", "release": "Ubuntu 20.04"},
+            },
+        )
+        server._client = mock_client
+
+        # Get the tool and execute it
         tools = await server.app.get_tools()
-        tool_names = list(tools.keys())
-        assert "ListRulesTool" not in tool_names
+        get_agent_info_tool = tools["GetAgentInfo"]
+
+        # Mock arguments
+        from velociraptor_mcp_server.server import GetAgentInfoArgs
+
+        args = GetAgentInfoArgs(hostname="test-host")
+
+        # Execute the tool
+        result = await get_agent_info_tool(args)
+
+        # Verify result
+        assert len(result) == 1
+        assert result[0]["type"] == "text"
+        assert "Client information for 'test-host'" in result[0]["text"]
+        assert "C.1234567890" in result[0]["text"]
+        mock_client.find_client_info.assert_called_once_with("test-host")
 
     @pytest.mark.asyncio
-    async def test_get_rule_file_content_tool_registration(self, config):
-        """Test that GetRuleFileContentTool is registered when not disabled."""
-        server = WazuhMCPServer(config)
+    async def test_get_agent_info_tool_execution_not_found(self, config):
+        """Test GetAgentInfo execution when client not found."""
+        server = VelociraptorMCPServer(config)
 
-        # Check that the tool is registered
+        # Mock the client
+        mock_client = Mock()
+        mock_client.stub = Mock()  # Simulate authenticated client
+        mock_client.authenticate = AsyncMock()
+        mock_client.find_client_info = Mock(return_value=None)
+        server._client = mock_client
+
+        # Get the tool and execute it
         tools = await server.app.get_tools()
-        tool_names = list(tools.keys())
-        assert "GetRuleFileContentTool" in tool_names
+        get_agent_info_tool = tools["GetAgentInfo"]
+
+        # Mock arguments
+        from velociraptor_mcp_server.server import GetAgentInfoArgs
+
+        args = GetAgentInfoArgs(hostname="nonexistent-host")
+
+        # Execute the tool
+        result = await get_agent_info_tool(args)
+
+        # Verify result
+        assert len(result) == 1
+        assert result[0]["type"] == "text"
+        assert "No client found with hostname: nonexistent-host" in result[0]["text"]
+        mock_client.find_client_info.assert_called_once_with("nonexistent-host")
 
     @pytest.mark.asyncio
-    async def test_get_rule_file_content_tool_disabled(self, config):
-        """Test that GetRuleFileContentTool is not registered when disabled."""
-        config.server.disabled_tools = ["GetRuleFileContentTool"]
-        server = WazuhMCPServer(config)
+    async def test_run_vql_query_tool_execution(self, config):
+        """Test RunVQLQueryTool execution."""
+        server = VelociraptorMCPServer(config)
 
-        # Check that the tool is not registered
+        # Mock the client
+        mock_client = Mock()
+        mock_client.stub = Mock()  # Simulate authenticated client
+        mock_client.authenticate = AsyncMock()
+        mock_client.run_vql_query = Mock(
+            return_value=[
+                {"client_id": "C.1234567890", "hostname": "test-host"},
+                {"client_id": "C.0987654321", "hostname": "test-host-2"},
+            ],
+        )
+        server._client = mock_client
+
+        # Get the tool and execute it
         tools = await server.app.get_tools()
-        tool_names = list(tools.keys())
-        assert "GetRuleFileContentTool" not in tool_names
+        run_vql_query_tool = tools["RunVQLQueryTool"]
 
-    @pytest.mark.asyncio
-    async def test_get_agent_sca_tool_registration(self, config):
-        """Test that GetAgentSCATool is registered when not disabled."""
-        server = WazuhMCPServer(config)
+        # Mock arguments
+        from velociraptor_mcp_server.server import RunVQLQueryArgs
 
-        # Check that the tool is registered
-        tools = await server.app.get_tools()
-        tool_names = list(tools.keys())
-        assert "GetAgentSCATool" in tool_names
+        args = RunVQLQueryArgs(vql="SELECT * FROM clients() LIMIT 10")
 
-    @pytest.mark.asyncio
-    async def test_get_agent_sca_tool_disabled(self, config):
-        """Test that GetAgentSCATool is not registered when disabled."""
-        config.server.disabled_tools = ["GetAgentSCATool"]
-        server = WazuhMCPServer(config)
+        # Execute the tool
+        result = await run_vql_query_tool(args)
 
-        # Check that the tool is not registered
-        tools = await server.app.get_tools()
-        tool_names = list(tools.keys())
-        assert "GetAgentSCATool" not in tool_names
-
-    @pytest.mark.asyncio
-    async def test_get_sca_policy_checks_tool_registration(self, config):
-        """Test that GetSCAPolicyChecksTool is registered when not disabled."""
-        server = WazuhMCPServer(config)
-
-        # Check that the tool is registered
-        tools = await server.app.get_tools()
-        tool_names = list(tools.keys())
-        assert "GetSCAPolicyChecksTool" in tool_names
-
-    @pytest.mark.asyncio
-    async def test_get_sca_policy_checks_tool_disabled(self, config):
-        """Test that GetSCAPolicyChecksTool is not registered when disabled."""
-        config.server.disabled_tools = ["GetSCAPolicyChecksTool"]
-        server = WazuhMCPServer(config)
-
-        # Check that the tool is not registered
-        tools = await server.app.get_tools()
-        tool_names = list(tools.keys())
-        assert "GetSCAPolicyChecksTool" not in tool_names
+        # Verify result
+        assert len(result) == 1
+        assert result[0]["type"] == "text"
+        result_data = json.loads(result[0]["text"])
+        assert len(result_data) == 2
+        assert result_data[0]["client_id"] == "C.1234567890"
+        mock_client.run_vql_query.assert_called_once_with("SELECT * FROM clients() LIMIT 10")
 
 
 class TestCreateServer:
@@ -233,7 +283,7 @@ class TestCreateServer:
         """Test create_server with provided config."""
         server = create_server(config)
 
-        assert isinstance(server, WazuhMCPServer)
+        assert isinstance(server, VelociraptorMCPServer)
         assert server.config == config
 
     @patch("velociraptor_mcp_server.server.Config.from_env")
@@ -243,5 +293,5 @@ class TestCreateServer:
 
         server = create_server()
 
-        assert isinstance(server, WazuhMCPServer)
+        assert isinstance(server, VelociraptorMCPServer)
         mock_from_env.assert_called_once()
