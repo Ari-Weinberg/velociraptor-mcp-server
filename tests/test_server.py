@@ -465,7 +465,7 @@ class TestVelociraptorMCPServer:
                     "status": "RUNNING",
                     "client_id": "C.1234567890",
                 },
-            ]
+            ],
         )
         server._client = mock_client
 
@@ -474,18 +474,20 @@ class TestVelociraptorMCPServer:
         collect_artifact_tool = tools["CollectArtifactTool"]
 
         # Execute the tool
-        result = await collect_artifact_tool.run({
-            "args": {
-                "client_id": "C.1234567890",
-                "artifact": "Windows.System.Users",
-                "parameters": "user='Administrator'",
-            }
-        })
+        result = await collect_artifact_tool.run(
+            {
+                "args": {
+                    "client_id": "C.1234567890",
+                    "artifact": "Windows.System.Users",
+                    "parameters": "user='Administrator'",
+                },
+            },
+        )
 
         # Verify result - ToolResult object
-        assert hasattr(result, 'content')
+        assert hasattr(result, "content")
         assert len(result.content) == 1
-        assert hasattr(result.content[0], 'text')
+        assert hasattr(result.content[0], "text")
 
         result_text = result.content[0].text
         assert "Collection started successfully" in result_text
@@ -496,7 +498,7 @@ class TestVelociraptorMCPServer:
         mock_client.start_collection.assert_called_once_with(
             "C.1234567890",
             "Windows.System.Users",
-            "user='Administrator'"
+            "user='Administrator'",
         )
 
     @pytest.mark.asyncio
@@ -511,7 +513,10 @@ class TestVelociraptorMCPServer:
         assert "GetCollectionResultsTool" in tools
         tool = tools["GetCollectionResultsTool"]
         assert tool.name == "GetCollectionResultsTool"
-        assert "retrieve" in tool.description.lower() or "collection results" in tool.description.lower()
+        assert (
+            "retrieve" in tool.description.lower()
+            or "collection results" in tool.description.lower()
+        )
 
     @pytest.mark.asyncio
     async def test_get_collection_results_tool_disabled(self, config):
@@ -541,9 +546,9 @@ class TestVelociraptorMCPServer:
             return_value=[
                 {
                     "name": "Windows.System.Users",
-                    "source_names": []  # No sources, so use artifact name directly
-                }
-            ]
+                    "source_names": [],  # No sources, so use artifact name directly
+                },
+            ],
         )
 
         mock_client.get_flow_status = Mock(return_value="FINISHED")
@@ -561,7 +566,7 @@ class TestVelociraptorMCPServer:
                     "uid": 501,
                     "gid": 514,
                 },
-            ]
+            ],
         )
         server._client = mock_client
 
@@ -570,21 +575,23 @@ class TestVelociraptorMCPServer:
         get_collection_results_tool = tools["GetCollectionResultsTool"]
 
         # Execute the tool
-        result = await get_collection_results_tool.run({
-            "args": {
-                "client_id": "C.1234567890",
-                "flow_id": "F.ABCDEF123456",
-                "artifact": "Windows.System.Users",
-                "fields": "username,full_name,uid,gid",
-                "max_retries": 1,  # Set to 1 for quick testing
-                "retry_delay": 1,  # Set to 1 second for quick testing
-            }
-        })
+        result = await get_collection_results_tool.run(
+            {
+                "args": {
+                    "client_id": "C.1234567890",
+                    "flow_id": "F.ABCDEF123456",
+                    "artifact": "Windows.System.Users",
+                    "fields": "username,full_name,uid,gid",
+                    "max_retries": 1,  # Set to 1 for quick testing
+                    "retry_delay": 1,  # Set to 1 second for quick testing
+                },
+            },
+        )
 
         # Verify result - ToolResult object
-        assert hasattr(result, 'content')
+        assert hasattr(result, "content")
         assert len(result.content) == 1
-        assert hasattr(result.content[0], 'text')
+        assert hasattr(result.content[0], "text")
 
         result_text = result.content[0].text
         assert "Collection results for flow F.ABCDEF123456" in result_text
@@ -593,18 +600,18 @@ class TestVelociraptorMCPServer:
 
         # Verify the methods were called correctly
         mock_client.run_vql_query.assert_called_once_with(
-            "SELECT name,sources.name as source_names FROM artifact_definitions() WHERE name = 'Windows.System.Users'"
+            "SELECT name,sources.name as source_names FROM artifact_definitions() WHERE name = 'Windows.System.Users'",
         )
         mock_client.get_flow_status.assert_called_once_with(
             "C.1234567890",
             "F.ABCDEF123456",
-            "Windows.System.Users"
+            "Windows.System.Users",
         )
         mock_client.get_flow_results.assert_called_once_with(
             "C.1234567890",
             "F.ABCDEF123456",
             "Windows.System.Users",
-            "username,full_name,uid,gid"
+            "username,full_name,uid,gid",
         )
 
     @pytest.mark.asyncio
@@ -622,9 +629,9 @@ class TestVelociraptorMCPServer:
             return_value=[
                 {
                     "name": "Windows.System.Users",
-                    "source_names": []  # No sources, so use artifact name directly
-                }
-            ]
+                    "source_names": [],  # No sources, so use artifact name directly
+                },
+            ],
         )
 
         mock_client.get_flow_status = Mock(return_value="RUNNING")  # Always running
@@ -635,20 +642,22 @@ class TestVelociraptorMCPServer:
         get_collection_results_tool = tools["GetCollectionResultsTool"]
 
         # Execute the tool with quick timeout
-        result = await get_collection_results_tool.run({
-            "args": {
-                "client_id": "C.1234567890",
-                "flow_id": "F.ABCDEF123456",
-                "artifact": "Windows.System.Users",
-                "max_retries": 2,  # Set to 2 for quick testing
-                "retry_delay": 1,  # Set to 1 second for quick testing
-            }
-        })
+        result = await get_collection_results_tool.run(
+            {
+                "args": {
+                    "client_id": "C.1234567890",
+                    "flow_id": "F.ABCDEF123456",
+                    "artifact": "Windows.System.Users",
+                    "max_retries": 2,  # Set to 2 for quick testing
+                    "retry_delay": 1,  # Set to 1 second for quick testing
+                },
+            },
+        )
 
         # Verify result - ToolResult object
-        assert hasattr(result, 'content')
+        assert hasattr(result, "content")
         assert len(result.content) == 1
-        assert hasattr(result.content[0], 'text')
+        assert hasattr(result.content[0], "text")
 
         result_text = result.content[0].text
         assert "Collection results not available after 2 retries" in result_text
@@ -657,7 +666,7 @@ class TestVelociraptorMCPServer:
 
         # Verify the methods were called correctly
         mock_client.run_vql_query.assert_called_once_with(
-            "SELECT name,sources.name as source_names FROM artifact_definitions() WHERE name = 'Windows.System.Users'"
+            "SELECT name,sources.name as source_names FROM artifact_definitions() WHERE name = 'Windows.System.Users'",
         )
         # Verify the status was checked multiple times
         assert mock_client.get_flow_status.call_count == 2
@@ -677,9 +686,9 @@ class TestVelociraptorMCPServer:
             return_value=[
                 {
                     "name": "Linux.Debian.Packages",
-                    "source_names": ["DebPackages", "Snaps"]  # Multiple sources
-                }
-            ]
+                    "source_names": ["DebPackages", "Snaps"],  # Multiple sources
+                },
+            ],
         )
 
         # Mock get_flow_status to return FINISHED for both sources
@@ -707,21 +716,23 @@ class TestVelociraptorMCPServer:
         get_collection_results_tool = tools["GetCollectionResultsTool"]
 
         # Execute the tool
-        result = await get_collection_results_tool.run({
-            "args": {
-                "client_id": "C.1234567890",
-                "flow_id": "F.ABCDEF123456",
-                "artifact": "Linux.Debian.Packages",
-                "fields": "*",
-                "max_retries": 1,
-                "retry_delay": 1,
-            }
-        })
+        result = await get_collection_results_tool.run(
+            {
+                "args": {
+                    "client_id": "C.1234567890",
+                    "flow_id": "F.ABCDEF123456",
+                    "artifact": "Linux.Debian.Packages",
+                    "fields": "*",
+                    "max_retries": 1,
+                    "retry_delay": 1,
+                },
+            },
+        )
 
         # Verify result - ToolResult object
-        assert hasattr(result, 'content')
+        assert hasattr(result, "content")
         assert len(result.content) == 1
-        assert hasattr(result.content[0], 'text')
+        assert hasattr(result.content[0], "text")
 
         result_text = result.content[0].text
         assert "Collection results for flow F.ABCDEF123456" in result_text
@@ -732,25 +743,35 @@ class TestVelociraptorMCPServer:
 
         # Verify the methods were called correctly
         mock_client.run_vql_query.assert_called_once_with(
-            "SELECT name,sources.name as source_names FROM artifact_definitions() WHERE name = 'Linux.Debian.Packages'"
+            "SELECT name,sources.name as source_names FROM artifact_definitions() WHERE name = 'Linux.Debian.Packages'",
         )
 
         # Verify get_flow_status was called for both sources
         assert mock_client.get_flow_status.call_count == 2
         mock_client.get_flow_status.assert_any_call(
-            "C.1234567890", "F.ABCDEF123456", "Linux.Debian.Packages/DebPackages"
+            "C.1234567890",
+            "F.ABCDEF123456",
+            "Linux.Debian.Packages/DebPackages",
         )
         mock_client.get_flow_status.assert_any_call(
-            "C.1234567890", "F.ABCDEF123456", "Linux.Debian.Packages/Snaps"
+            "C.1234567890",
+            "F.ABCDEF123456",
+            "Linux.Debian.Packages/Snaps",
         )
 
         # Verify get_flow_results was called for both sources
         assert mock_client.get_flow_results.call_count == 2
         mock_client.get_flow_results.assert_any_call(
-            "C.1234567890", "F.ABCDEF123456", "Linux.Debian.Packages/DebPackages", "*"
+            "C.1234567890",
+            "F.ABCDEF123456",
+            "Linux.Debian.Packages/DebPackages",
+            "*",
         )
         mock_client.get_flow_results.assert_any_call(
-            "C.1234567890", "F.ABCDEF123456", "Linux.Debian.Packages/Snaps", "*"
+            "C.1234567890",
+            "F.ABCDEF123456",
+            "Linux.Debian.Packages/Snaps",
+            "*",
         )
 
     @pytest.mark.asyncio
@@ -768,9 +789,9 @@ class TestVelociraptorMCPServer:
             return_value=[
                 {
                     "name": "Linux.Sys.Users",
-                    "source_names": ["", None, "   "]  # Empty, null, and whitespace-only sources
-                }
-            ]
+                    "source_names": ["", None, "   "],  # Empty, null, and whitespace-only sources
+                },
+            ],
         )
 
         mock_client.get_flow_status = Mock(return_value="FINISHED")
@@ -786,7 +807,7 @@ class TestVelociraptorMCPServer:
                     "uid": 1000,
                     "gid": 1000,
                 },
-            ]
+            ],
         )
         server._client = mock_client
 
@@ -795,21 +816,23 @@ class TestVelociraptorMCPServer:
         get_collection_results_tool = tools["GetCollectionResultsTool"]
 
         # Execute the tool
-        result = await get_collection_results_tool.run({
-            "args": {
-                "client_id": "C.1234567890",
-                "flow_id": "F.ABCDEF123456",
-                "artifact": "Linux.Sys.Users",
-                "fields": "*",
-                "max_retries": 1,
-                "retry_delay": 1,
-            }
-        })
+        result = await get_collection_results_tool.run(
+            {
+                "args": {
+                    "client_id": "C.1234567890",
+                    "flow_id": "F.ABCDEF123456",
+                    "artifact": "Linux.Sys.Users",
+                    "fields": "*",
+                    "max_retries": 1,
+                    "retry_delay": 1,
+                },
+            },
+        )
 
         # Verify result - ToolResult object
-        assert hasattr(result, 'content')
+        assert hasattr(result, "content")
         assert len(result.content) == 1
-        assert hasattr(result.content[0], 'text')
+        assert hasattr(result.content[0], "text")
 
         result_text = result.content[0].text
         assert "Collection results for flow F.ABCDEF123456" in result_text
@@ -818,18 +841,18 @@ class TestVelociraptorMCPServer:
 
         # Verify the methods were called correctly - should use artifact name directly without slash
         mock_client.run_vql_query.assert_called_once_with(
-            "SELECT name,sources.name as source_names FROM artifact_definitions() WHERE name = 'Linux.Sys.Users'"
+            "SELECT name,sources.name as source_names FROM artifact_definitions() WHERE name = 'Linux.Sys.Users'",
         )
         mock_client.get_flow_status.assert_called_once_with(
             "C.1234567890",
             "F.ABCDEF123456",
-            "Linux.Sys.Users"  # Should NOT have a trailing slash
+            "Linux.Sys.Users",  # Should NOT have a trailing slash
         )
         mock_client.get_flow_results.assert_called_once_with(
             "C.1234567890",
             "F.ABCDEF123456",
             "Linux.Sys.Users",  # Should NOT have a trailing slash
-            "*"
+            "*",
         )
 
     @pytest.mark.asyncio
@@ -875,11 +898,11 @@ class TestVelociraptorMCPServer:
                     "description": "Collect user account information from Windows systems including user profiles, group memberships, and account settings.",
                     "parameters": [
                         {"name": "UserFilter", "description": "Filter users by name pattern"},
-                        {"name": "IncludeGroups", "description": "Include group memberships"}
+                        {"name": "IncludeGroups", "description": "Include group memberships"},
                     ],
-                    "source_names": ["Users", "Groups"]  # List of source names
-                }
-            ]
+                    "source_names": ["Users", "Groups"],  # List of source names
+                },
+            ],
         )
         server._client = mock_client
 
@@ -888,14 +911,14 @@ class TestVelociraptorMCPServer:
         collect_artifact_details_tool = tools["CollectArtifactDetailsTool"]
 
         # Execute the tool
-        result = await collect_artifact_details_tool.run({
-            "args": {"artifact_name": "Windows.System.Users"}
-        })
+        result = await collect_artifact_details_tool.run(
+            {"args": {"artifact_name": "Windows.System.Users"}},
+        )
 
         # Verify result - ToolResult object
-        assert hasattr(result, 'content')
+        assert hasattr(result, "content")
         assert len(result.content) == 1
-        assert hasattr(result.content[0], 'text')
+        assert hasattr(result.content[0], "text")
 
         result_text = result.content[0].text
         assert "Artifact details for 'Windows.System.Users'" in result_text
@@ -908,7 +931,7 @@ class TestVelociraptorMCPServer:
 
         # Verify the VQL query was called with correct parameters
         mock_client.run_vql_query.assert_called_once_with(
-            "SELECT name,description,parameters,sources.name as source_names FROM artifact_definitions() WHERE name = 'Windows.System.Users'"
+            "SELECT name,description,parameters,sources.name as source_names FROM artifact_definitions() WHERE name = 'Windows.System.Users'",
         )
 
     @pytest.mark.asyncio
@@ -928,21 +951,21 @@ class TestVelociraptorMCPServer:
         collect_artifact_details_tool = tools["CollectArtifactDetailsTool"]
 
         # Execute the tool
-        result = await collect_artifact_details_tool.run({
-            "args": {"artifact_name": "NonExistent.Artifact"}
-        })
+        result = await collect_artifact_details_tool.run(
+            {"args": {"artifact_name": "NonExistent.Artifact"}},
+        )
 
         # Verify result - ToolResult object
-        assert hasattr(result, 'content')
+        assert hasattr(result, "content")
         assert len(result.content) == 1
-        assert hasattr(result.content[0], 'text')
+        assert hasattr(result.content[0], "text")
 
         result_text = result.content[0].text
         assert "No artifact found with name: NonExistent.Artifact" in result_text
 
         # Verify the VQL query was called
         mock_client.run_vql_query.assert_called_once_with(
-            "SELECT name,description,parameters,sources.name as source_names FROM artifact_definitions() WHERE name = 'NonExistent.Artifact'"
+            "SELECT name,description,parameters,sources.name as source_names FROM artifact_definitions() WHERE name = 'NonExistent.Artifact'",
         )
 
     @pytest.mark.asyncio
@@ -960,9 +983,9 @@ class TestVelociraptorMCPServer:
             return_value=[
                 {
                     "name": "Linux.Debian.Packages",
-                    "source_names": ["DebPackages", "Snaps"]  # Multiple sources
-                }
-            ]
+                    "source_names": ["DebPackages", "Snaps"],  # Multiple sources
+                },
+            ],
         )
 
         # Mock get_flow_status to simulate one source finishing and one still running
@@ -970,7 +993,7 @@ class TestVelociraptorMCPServer:
             if "DebPackages" in artifact_name:
                 return "FINISHED"  # DebPackages source finishes
             elif "Snaps" in artifact_name:
-                return "RUNNING"   # Snaps source keeps running
+                return "RUNNING"  # Snaps source keeps running
             return "RUNNING"
 
         mock_client.get_flow_status = Mock(side_effect=mock_get_flow_status)
@@ -980,7 +1003,7 @@ class TestVelociraptorMCPServer:
             if "DebPackages" in artifact_name:
                 return [
                     {"package": "vim", "version": "8.2", "architecture": "amd64"},
-                    {"package": "curl", "version": "7.68", "architecture": "amd64"}
+                    {"package": "curl", "version": "7.68", "architecture": "amd64"},
                 ]
             return []
 
@@ -992,21 +1015,23 @@ class TestVelociraptorMCPServer:
         get_collection_results_tool = tools["GetCollectionResultsTool"]
 
         # Execute the tool with low retry count to trigger partial results
-        result = await get_collection_results_tool.run({
-            "args": {
-                "client_id": "C.1234567890",
-                "flow_id": "F.ABCDEF123456",
-                "artifact": "Linux.Debian.Packages",
-                "fields": "*",
-                "max_retries": 1,  # Low retry count to trigger timeout
-                "retry_delay": 1,
-            }
-        })
+        result = await get_collection_results_tool.run(
+            {
+                "args": {
+                    "client_id": "C.1234567890",
+                    "flow_id": "F.ABCDEF123456",
+                    "artifact": "Linux.Debian.Packages",
+                    "fields": "*",
+                    "max_retries": 1,  # Low retry count to trigger timeout
+                    "retry_delay": 1,
+                },
+            },
+        )
 
         # Verify result - ToolResult object
-        assert hasattr(result, 'content')
+        assert hasattr(result, "content")
         assert len(result.content) == 1
-        assert hasattr(result.content[0], 'text')
+        assert hasattr(result.content[0], "text")
 
         result_text = result.content[0].text
         assert "Collection results for flow F.ABCDEF123456" in result_text
@@ -1020,19 +1045,28 @@ class TestVelociraptorMCPServer:
 
         # Verify the methods were called correctly
         mock_client.run_vql_query.assert_called_once_with(
-            "SELECT name,sources.name as source_names FROM artifact_definitions() WHERE name = 'Linux.Debian.Packages'"
+            "SELECT name,sources.name as source_names FROM artifact_definitions() WHERE name = 'Linux.Debian.Packages'",
         )
 
         # Verify get_flow_status was called for both sources
-        assert mock_client.get_flow_status.call_count >= 2  # Called at least twice (once per source)
+        assert (
+            mock_client.get_flow_status.call_count >= 2
+        )  # Called at least twice (once per source)
         mock_client.get_flow_status.assert_any_call(
-            "C.1234567890", "F.ABCDEF123456", "Linux.Debian.Packages/DebPackages"
+            "C.1234567890",
+            "F.ABCDEF123456",
+            "Linux.Debian.Packages/DebPackages",
         )
         mock_client.get_flow_status.assert_any_call(
-            "C.1234567890", "F.ABCDEF123456", "Linux.Debian.Packages/Snaps"
+            "C.1234567890",
+            "F.ABCDEF123456",
+            "Linux.Debian.Packages/Snaps",
         )
 
         # Verify get_flow_results was called only for the finished source
         mock_client.get_flow_results.assert_called_once_with(
-            "C.1234567890", "F.ABCDEF123456", "Linux.Debian.Packages/DebPackages", "*"
+            "C.1234567890",
+            "F.ABCDEF123456",
+            "Linux.Debian.Packages/DebPackages",
+            "*",
         )

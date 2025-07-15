@@ -54,7 +54,10 @@ class CollectArtifactArgs(BaseModel):
 
     client_id: str = Field(..., description="Velociraptor client ID to target for collection")
     artifact: str = Field(..., description="Name of the Velociraptor artifact to collect")
-    parameters: str = Field("", description="Comma-separated string of key='value' pairs to pass to the artifact")
+    parameters: str = Field(
+        "",
+        description="Comma-separated string of key='value' pairs to pass to the artifact",
+    )
 
 
 class GetCollectionResultsArgs(BaseModel):
@@ -62,8 +65,14 @@ class GetCollectionResultsArgs(BaseModel):
 
     client_id: str = Field(..., description="Velociraptor client ID where the collection was run")
     flow_id: str = Field(..., description="Flow ID returned from the initial collection")
-    artifact: str = Field(..., description="Name of the artifact collected (e.g., Windows.NTFS.MFT)")
-    fields: str = Field("*", description="Comma-separated string of fields to return (default is '*')")
+    artifact: str = Field(
+        ...,
+        description="Name of the artifact collected (e.g., Windows.NTFS.MFT)",
+    )
+    fields: str = Field(
+        "*",
+        description="Comma-separated string of fields to return (default is '*')",
+    )
     max_retries: int = Field(5, description="Number of times to retry if the flow hasn't finished")
     retry_delay: int = Field(5, description="Time in seconds to wait between retries")
 
@@ -71,7 +80,10 @@ class GetCollectionResultsArgs(BaseModel):
 class CollectArtifactDetailsArgs(BaseModel):
     """Arguments for getting detailed artifact information."""
 
-    artifact_name: str = Field(..., description="Name of the artifact to get details for (e.g., Windows.System.Users)")
+    artifact_name: str = Field(
+        ...,
+        description="Name of the artifact to get details for (e.g., Windows.System.Users)",
+    )
 
 
 class VelociraptorMCPServer:
@@ -393,10 +405,18 @@ class VelociraptorMCPServer:
                         await client.authenticate()
 
                     # Start the collection using the client's start_collection method
-                    response = client.start_collection(args.client_id, args.artifact, args.parameters)
+                    response = client.start_collection(
+                        args.client_id,
+                        args.artifact,
+                        args.parameters,
+                    )
 
                     # Ensure the response contains the flow ID
-                    if not isinstance(response, list) or not response or "flow_id" not in response[0]:
+                    if (
+                        not isinstance(response, list)
+                        or not response
+                        or "flow_id" not in response[0]
+                    ):
                         return [
                             {
                                 "type": "text",
@@ -493,8 +513,14 @@ class VelociraptorMCPServer:
                         incomplete_sources = []  # Reset incomplete sources for this attempt
 
                         for artifact_with_source in artifacts_to_check:
-                            if artifact_with_source not in all_results:  # Only check if we haven't gotten results yet
-                                status = client.get_flow_status(args.client_id, args.flow_id, artifact_with_source)
+                            if (
+                                artifact_with_source not in all_results
+                            ):  # Only check if we haven't gotten results yet
+                                status = client.get_flow_status(
+                                    args.client_id,
+                                    args.flow_id,
+                                    artifact_with_source,
+                                )
                                 logger.info("Flow status for %s: %s", artifact_with_source, status)
 
                                 if status == "FINISHED":
@@ -506,29 +532,54 @@ class VelociraptorMCPServer:
                                         args.fields,
                                     )
                                     all_results[artifact_with_source] = results
-                                    logger.info("Got results for %s: %d records", artifact_with_source, len(results) if results else 0)
+                                    logger.info(
+                                        "Got results for %s: %d records",
+                                        artifact_with_source,
+                                        len(results) if results else 0,
+                                    )
                                 else:
                                     all_finished = False
                                     incomplete_sources.append(artifact_with_source)
 
                         # If all artifacts/sources are finished, return the results
                         if all_finished:
-                            return self._format_collection_results(args, artifacts_to_check, all_results, incomplete_sources=[])
+                            return self._format_collection_results(
+                                args,
+                                artifacts_to_check,
+                                all_results,
+                                incomplete_sources=[],
+                            )
 
                         # If this is the last attempt and we have some results, return partial results
                         if attempt == args.max_retries - 1 and all_results:
-                            logger.info("Max retries reached, returning partial results. Incomplete sources: %s", incomplete_sources)
-                            return self._format_collection_results(args, artifacts_to_check, all_results, incomplete_sources)
+                            logger.info(
+                                "Max retries reached, returning partial results. Incomplete sources: %s",
+                                incomplete_sources,
+                            )
+                            return self._format_collection_results(
+                                args,
+                                artifacts_to_check,
+                                all_results,
+                                incomplete_sources,
+                            )
 
                         # If not all finished and not the last attempt, wait before retrying
                         if attempt < args.max_retries - 1:
-                            logger.info("Some artifacts not finished, waiting %d seconds before retry", args.retry_delay)
+                            logger.info(
+                                "Some artifacts not finished, waiting %d seconds before retry",
+                                args.retry_delay,
+                            )
                             await asyncio.sleep(args.retry_delay)
 
                     # If we've exhausted retries and have no results
                     if all_results:
                         # This shouldn't happen due to the check above, but just in case
-                        return self._format_collection_results(args, artifacts_to_check, all_results, incomplete_sources)
+                        return self._format_collection_results(
+                            args,
+                            artifacts_to_check,
+                            all_results,
+                            incomplete_sources,
+                        )
                     else:
                         return [
                             {
@@ -605,7 +656,7 @@ class VelociraptorMCPServer:
                         "description": artifact_details.get("description", ""),
                         "parameters": artifact_details.get("parameters", []),
                         "source_names": source_names,
-                        "source_count": len(source_names) if source_names else 0
+                        "source_count": len(source_names) if source_names else 0,
                     }
 
                     response_text = json.dumps(formatted_details, indent=2)
@@ -665,7 +716,9 @@ class VelociraptorMCPServer:
                 "flow_id": args.flow_id,
                 "artifact": args.artifact,
                 "sources": all_results,
-                "total_records": sum(len(results) if results else 0 for results in all_results.values()),
+                "total_records": sum(
+                    len(results) if results else 0 for results in all_results.values()
+                ),
                 "completed_sources": completed_count,
                 "total_sources": total_count,
             }
@@ -680,12 +733,16 @@ class VelociraptorMCPServer:
 
             status_msg = ""
             if has_incomplete_sources:
-                status_msg = f"\n\n⚠️  WARNING: Partial results returned after timeout. " \
-                           f"Completed {completed_count}/{total_count} sources. " \
-                           f"Incomplete sources: {', '.join(incomplete_sources)}. " \
-                           f"You may want to check these sources later or increase retry settings."
+                status_msg = (
+                    f"\n\n⚠️  WARNING: Partial results returned after timeout. "
+                    f"Completed {completed_count}/{total_count} sources. "
+                    f"Incomplete sources: {', '.join(incomplete_sources)}. "
+                    f"You may want to check these sources later or increase retry settings."
+                )
 
-            collection_type = "with partial results" if has_incomplete_sources else "with multiple sources"
+            collection_type = (
+                "with partial results" if has_incomplete_sources else "with multiple sources"
+            )
             return [
                 {
                     "type": "text",
