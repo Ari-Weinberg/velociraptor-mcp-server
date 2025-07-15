@@ -453,7 +453,31 @@ class VelociraptorMCPServer:
                     if client.stub is None:
                         await client.authenticate()
 
+                    # First, get artifact details to check if it has multiple sources
+                    artifact_details_vql = f"SELECT name,sources.name as source_names FROM artifact_definitions() WHERE name = '{args.artifact}'"
+                    artifact_details = client.run_vql_query(artifact_details_vql)
+
+                    source_names = []
+                    if artifact_details and len(artifact_details) > 0:
+                        source_names = artifact_details[0].get("source_names", [])
+
+                    # Filter out empty or None source names
+                    valid_source_names = [name for name in source_names if name and name.strip()]
+
+                    # Determine the artifact names to check (with sources if they exist)
+                    artifacts_to_check = []
+                    if valid_source_names and len(valid_source_names) > 0:
+                        # Artifact has multiple sources, check each one
+                        for source_name in valid_source_names:
+                            artifacts_to_check.append(f"{args.artifact}/{source_name}")
+                    else:
+                        # Artifact has no valid sources, use the artifact name directly
+                        artifacts_to_check.append(args.artifact)
+
+                    logger.info("Checking artifacts: %s", artifacts_to_check)
+
                     # Retry logic to wait for collection completion
+                    all_results = {}
                     for attempt in range(args.max_retries):
                         logger.info(
                             "Checking collection status (attempt %d/%d) for flow %s",
@@ -462,29 +486,56 @@ class VelociraptorMCPServer:
                             args.flow_id,
                         )
 
-                        # Check flow status
-                        status = client.get_flow_status(args.client_id, args.flow_id, args.artifact)
+                        # Check status for each artifact (with sources)
+                        all_finished = True
+                        for artifact_with_source in artifacts_to_check:
+                            if artifact_with_source not in all_results:  # Only check if we haven't gotten results yet
+                                status = client.get_flow_status(args.client_id, args.flow_id, artifact_with_source)
+                                logger.info("Flow status for %s: %s", artifact_with_source, status)
 
-                        logger.info("Flow status: %s", status)
+                                if status == "FINISHED":
+                                    # Get the results for this artifact/source
+                                    results = client.get_flow_results(
+                                        args.client_id,
+                                        args.flow_id,
+                                        artifact_with_source,
+                                        args.fields,
+                                    )
+                                    all_results[artifact_with_source] = results
+                                    logger.info("Got results for %s: %d records", artifact_with_source, len(results) if results else 0)
+                                else:
+                                    all_finished = False
 
-                        if status == "FINISHED":
-                            # Get the results
-                            results = client.get_flow_results(
-                                args.client_id,
-                                args.flow_id,
-                                args.artifact,
-                                args.fields,
-                            )
-
-                            if results:
+                        # If all artifacts/sources are finished, return the results
+                        if all_finished:
+                            if all_results:
                                 # Format the response
-                                response_text = json.dumps(results, indent=2)
-                                return [
-                                    {
-                                        "type": "text",
-                                        "text": f"Collection results for flow {args.flow_id}:\n{self._safe_truncate(response_text)}",
-                                    },
-                                ]
+                                if len(artifacts_to_check) == 1:
+                                    # Single artifact/source
+                                    artifact_name = artifacts_to_check[0]
+                                    results = all_results[artifact_name]
+                                    response_text = json.dumps(results, indent=2)
+                                    return [
+                                        {
+                                            "type": "text",
+                                            "text": f"Collection results for flow {args.flow_id} (artifact: {artifact_name}):\n{self._safe_truncate(response_text)}",
+                                        },
+                                    ]
+                                else:
+                                    # Multiple sources - combine results
+                                    combined_response = {
+                                        "flow_id": args.flow_id,
+                                        "artifact": args.artifact,
+                                        "sources": all_results,
+                                        "total_records": sum(len(results) if results else 0 for results in all_results.values())
+                                    }
+                                    response_text = json.dumps(combined_response, indent=2)
+                                    return [
+                                        {
+                                            "type": "text",
+                                            "text": f"Collection results for flow {args.flow_id} (artifact: {args.artifact} with multiple sources):\n{self._safe_truncate(response_text)}",
+                                        },
+                                    ]
                             else:
                                 return [
                                     {
@@ -493,9 +544,9 @@ class VelociraptorMCPServer:
                                     },
                                 ]
 
-                        # If not finished, wait before retrying (except on last attempt)
+                        # If not all finished, wait before retrying (except on last attempt)
                         if attempt < args.max_retries - 1:
-                            logger.info("Flow not finished, waiting %d seconds before retry", args.retry_delay)
+                            logger.info("Some artifacts not finished, waiting %d seconds before retry", args.retry_delay)
                             await asyncio.sleep(args.retry_delay)
 
                     # If we've exhausted retries
@@ -504,7 +555,8 @@ class VelociraptorMCPServer:
                             "type": "text",
                             "text": f"Collection results not available after {args.max_retries} retries. "
                             f"Flow {args.flow_id} may still be running or may have failed. "
-                            f"Try again later or check the Velociraptor UI for flow status.",
+                            f"Try again later or check the Velociraptor UI for flow status. "
+                            f"Checked artifacts: {artifacts_to_check}",
                         },
                     ]
 

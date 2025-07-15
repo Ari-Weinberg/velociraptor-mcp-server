@@ -535,6 +535,17 @@ class TestVelociraptorMCPServer:
         mock_client = Mock()
         mock_client.stub = Mock()  # Simulate authenticated client
         mock_client.authenticate = AsyncMock()
+
+        # Mock run_vql_query for artifact details (no sources for this artifact)
+        mock_client.run_vql_query = Mock(
+            return_value=[
+                {
+                    "name": "Windows.System.Users",
+                    "source_names": []  # No sources, so use artifact name directly
+                }
+            ]
+        )
+
         mock_client.get_flow_status = Mock(return_value="FINISHED")
         mock_client.get_flow_results = Mock(
             return_value=[
@@ -581,6 +592,9 @@ class TestVelociraptorMCPServer:
         assert "Guest" in result_text
 
         # Verify the methods were called correctly
+        mock_client.run_vql_query.assert_called_once_with(
+            "SELECT name,sources.name as source_names FROM artifact_definitions() WHERE name = 'Windows.System.Users'"
+        )
         mock_client.get_flow_status.assert_called_once_with(
             "C.1234567890",
             "F.ABCDEF123456",
@@ -602,6 +616,17 @@ class TestVelociraptorMCPServer:
         mock_client = Mock()
         mock_client.stub = Mock()  # Simulate authenticated client
         mock_client.authenticate = AsyncMock()
+
+        # Mock run_vql_query for artifact details (no sources for this artifact)
+        mock_client.run_vql_query = Mock(
+            return_value=[
+                {
+                    "name": "Windows.System.Users",
+                    "source_names": []  # No sources, so use artifact name directly
+                }
+            ]
+        )
+
         mock_client.get_flow_status = Mock(return_value="RUNNING")  # Always running
         server._client = mock_client
 
@@ -630,8 +655,182 @@ class TestVelociraptorMCPServer:
         assert "F.ABCDEF123456" in result_text
         assert "may still be running" in result_text
 
+        # Verify the methods were called correctly
+        mock_client.run_vql_query.assert_called_once_with(
+            "SELECT name,sources.name as source_names FROM artifact_definitions() WHERE name = 'Windows.System.Users'"
+        )
         # Verify the status was checked multiple times
         assert mock_client.get_flow_status.call_count == 2
+
+    @pytest.mark.asyncio
+    async def test_get_collection_results_tool_execution_multiple_sources(self, config):
+        """Test GetCollectionResultsTool execution with an artifact that has multiple sources."""
+        server = VelociraptorMCPServer(config)
+
+        # Mock the client
+        mock_client = Mock()
+        mock_client.stub = Mock()  # Simulate authenticated client
+        mock_client.authenticate = AsyncMock()
+
+        # Mock run_vql_query for artifact details (artifact with multiple sources)
+        mock_client.run_vql_query = Mock(
+            return_value=[
+                {
+                    "name": "Linux.Debian.Packages",
+                    "source_names": ["DebPackages", "Snaps"]  # Multiple sources
+                }
+            ]
+        )
+
+        # Mock get_flow_status to return FINISHED for both sources
+        mock_client.get_flow_status = Mock(return_value="FINISHED")
+
+        # Mock get_flow_results to return different results for each source
+        def mock_get_flow_results(client_id, flow_id, artifact, fields):
+            if artifact == "Linux.Debian.Packages/DebPackages":
+                return [
+                    {"package": "vim", "version": "8.2.0716", "source": "deb"},
+                    {"package": "curl", "version": "7.68.0", "source": "deb"},
+                ]
+            elif artifact == "Linux.Debian.Packages/Snaps":
+                return [
+                    {"package": "firefox", "version": "99.0", "source": "snap"},
+                    {"package": "code", "version": "1.68.1", "source": "snap"},
+                ]
+            return []
+
+        mock_client.get_flow_results = Mock(side_effect=mock_get_flow_results)
+        server._client = mock_client
+
+        # Get the tool and execute it
+        tools = await server.app.get_tools()
+        get_collection_results_tool = tools["GetCollectionResultsTool"]
+
+        # Execute the tool
+        result = await get_collection_results_tool.run({
+            "args": {
+                "client_id": "C.1234567890",
+                "flow_id": "F.ABCDEF123456",
+                "artifact": "Linux.Debian.Packages",
+                "fields": "*",
+                "max_retries": 1,
+                "retry_delay": 1,
+            }
+        })
+
+        # Verify result - ToolResult object
+        assert hasattr(result, 'content')
+        assert len(result.content) == 1
+        assert hasattr(result.content[0], 'text')
+
+        result_text = result.content[0].text
+        assert "Collection results for flow F.ABCDEF123456" in result_text
+        assert "Linux.Debian.Packages with multiple sources" in result_text
+        assert "total_records" in result_text
+        assert "DebPackages" in result_text
+        assert "Snaps" in result_text
+
+        # Verify the methods were called correctly
+        mock_client.run_vql_query.assert_called_once_with(
+            "SELECT name,sources.name as source_names FROM artifact_definitions() WHERE name = 'Linux.Debian.Packages'"
+        )
+
+        # Verify get_flow_status was called for both sources
+        assert mock_client.get_flow_status.call_count == 2
+        mock_client.get_flow_status.assert_any_call(
+            "C.1234567890", "F.ABCDEF123456", "Linux.Debian.Packages/DebPackages"
+        )
+        mock_client.get_flow_status.assert_any_call(
+            "C.1234567890", "F.ABCDEF123456", "Linux.Debian.Packages/Snaps"
+        )
+
+        # Verify get_flow_results was called for both sources
+        assert mock_client.get_flow_results.call_count == 2
+        mock_client.get_flow_results.assert_any_call(
+            "C.1234567890", "F.ABCDEF123456", "Linux.Debian.Packages/DebPackages", "*"
+        )
+        mock_client.get_flow_results.assert_any_call(
+            "C.1234567890", "F.ABCDEF123456", "Linux.Debian.Packages/Snaps", "*"
+        )
+
+    @pytest.mark.asyncio
+    async def test_get_collection_results_tool_execution_empty_sources(self, config):
+        """Test GetCollectionResultsTool execution with artifact that has empty source names."""
+        server = VelociraptorMCPServer(config)
+
+        # Mock the client
+        mock_client = Mock()
+        mock_client.stub = Mock()  # Simulate authenticated client
+        mock_client.authenticate = AsyncMock()
+
+        # Mock run_vql_query for artifact details with empty/null sources
+        mock_client.run_vql_query = Mock(
+            return_value=[
+                {
+                    "name": "Linux.Sys.Users",
+                    "source_names": ["", None, "   "]  # Empty, null, and whitespace-only sources
+                }
+            ]
+        )
+
+        mock_client.get_flow_status = Mock(return_value="FINISHED")
+        mock_client.get_flow_results = Mock(
+            return_value=[
+                {
+                    "username": "root",
+                    "uid": 0,
+                    "gid": 0,
+                },
+                {
+                    "username": "user1",
+                    "uid": 1000,
+                    "gid": 1000,
+                },
+            ]
+        )
+        server._client = mock_client
+
+        # Get the tool and execute it
+        tools = await server.app.get_tools()
+        get_collection_results_tool = tools["GetCollectionResultsTool"]
+
+        # Execute the tool
+        result = await get_collection_results_tool.run({
+            "args": {
+                "client_id": "C.1234567890",
+                "flow_id": "F.ABCDEF123456",
+                "artifact": "Linux.Sys.Users",
+                "fields": "*",
+                "max_retries": 1,
+                "retry_delay": 1,
+            }
+        })
+
+        # Verify result - ToolResult object
+        assert hasattr(result, 'content')
+        assert len(result.content) == 1
+        assert hasattr(result.content[0], 'text')
+
+        result_text = result.content[0].text
+        assert "Collection results for flow F.ABCDEF123456" in result_text
+        assert "root" in result_text
+        assert "user1" in result_text
+
+        # Verify the methods were called correctly - should use artifact name directly without slash
+        mock_client.run_vql_query.assert_called_once_with(
+            "SELECT name,sources.name as source_names FROM artifact_definitions() WHERE name = 'Linux.Sys.Users'"
+        )
+        mock_client.get_flow_status.assert_called_once_with(
+            "C.1234567890",
+            "F.ABCDEF123456",
+            "Linux.Sys.Users"  # Should NOT have a trailing slash
+        )
+        mock_client.get_flow_results.assert_called_once_with(
+            "C.1234567890",
+            "F.ABCDEF123456",
+            "Linux.Sys.Users",  # Should NOT have a trailing slash
+            "*"
+        )
 
     @pytest.mark.asyncio
     async def test_collect_artifact_details_tool_registration(self, config):
@@ -678,7 +877,7 @@ class TestVelociraptorMCPServer:
                         {"name": "UserFilter", "description": "Filter users by name pattern"},
                         {"name": "IncludeGroups", "description": "Include group memberships"}
                     ],
-                    "source": "SELECT * FROM Artifact.Windows.Sys.Users(UserFilter=UserFilter, IncludeGroups=IncludeGroups)\nLET UserFilter <= '.*'\nLET IncludeGroups <= TRUE"
+                    "source_names": ["Users", "Groups"]  # List of source names
                 }
             ]
         )
@@ -704,10 +903,12 @@ class TestVelociraptorMCPServer:
         assert "Collect user account information" in result_text
         assert "UserFilter" in result_text
         assert "IncludeGroups" in result_text
+        assert "source_names" in result_text
+        assert "source_count" in result_text
 
         # Verify the VQL query was called with correct parameters
         mock_client.run_vql_query.assert_called_once_with(
-            "SELECT name,description,parameters,source FROM artifact_definitions() WHERE name = 'Windows.System.Users'"
+            "SELECT name,description,parameters,sources.name as source_names FROM artifact_definitions() WHERE name = 'Windows.System.Users'"
         )
 
     @pytest.mark.asyncio
@@ -741,5 +942,5 @@ class TestVelociraptorMCPServer:
 
         # Verify the VQL query was called
         mock_client.run_vql_query.assert_called_once_with(
-            "SELECT name,description,parameters,source FROM artifact_definitions() WHERE name = 'NonExistent.Artifact'"
+            "SELECT name,description,parameters,sources.name as source_names FROM artifact_definitions() WHERE name = 'NonExistent.Artifact'"
         )
