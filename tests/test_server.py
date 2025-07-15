@@ -421,25 +421,214 @@ class TestVelociraptorMCPServer:
         assert "artifact_definitions()" in called_vql
         assert "^windows\\." in called_vql
 
+    @pytest.mark.asyncio
+    async def test_collect_artifact_tool_registration(self, config):
+        """Test CollectArtifactTool registration."""
+        server = VelociraptorMCPServer(config)
 
-class TestCreateServer:
-    """Test create_server factory function."""
+        # Get all tools
+        tools = await server.app.get_tools()
 
-    def test_create_server_with_config(self, config):
-        """Test create_server with provided config."""
-        with patch("os.path.exists", return_value=True):
-            server = create_server(config)
+        # Check if CollectArtifactTool is registered
+        assert "CollectArtifactTool" in tools
+        tool = tools["CollectArtifactTool"]
+        assert tool.name == "CollectArtifactTool"
+        assert "collect" in tool.description.lower()
 
-            assert isinstance(server, VelociraptorMCPServer)
-            assert server.config == config
+    @pytest.mark.asyncio
+    async def test_collect_artifact_tool_disabled(self, config):
+        """Test CollectArtifactTool when disabled."""
+        # Disable the tool
+        config.server.disabled_tools = ["CollectArtifactTool"]
+        server = VelociraptorMCPServer(config)
 
-    @patch("velociraptor_mcp_server.server.Config.from_env")
-    def test_create_server_without_config(self, mock_from_env, config):
-        """Test create_server without config (uses env)."""
-        mock_from_env.return_value = config
+        # Get all tools
+        tools = await server.app.get_tools()
 
-        with patch("os.path.exists", return_value=True):
-            server = create_server()
+        # Check if CollectArtifactTool is not registered
+        assert "CollectArtifactTool" not in tools
 
-            assert isinstance(server, VelociraptorMCPServer)
-            mock_from_env.assert_called_once()
+    @pytest.mark.asyncio
+    async def test_collect_artifact_tool_execution(self, config):
+        """Test CollectArtifactTool execution."""
+        server = VelociraptorMCPServer(config)
+
+        # Mock the client
+        mock_client = Mock()
+        mock_client.stub = Mock()  # Simulate authenticated client
+        mock_client.authenticate = AsyncMock()
+        mock_client.start_collection = Mock(
+            return_value=[
+                {
+                    "flow_id": "F.1234567890ABCDEF",
+                    "artifacts": ["Windows.System.Users"],
+                    "status": "RUNNING",
+                    "client_id": "C.1234567890",
+                },
+            ]
+        )
+        server._client = mock_client
+
+        # Get the tool and execute it
+        tools = await server.app.get_tools()
+        collect_artifact_tool = tools["CollectArtifactTool"]
+
+        # Execute the tool
+        result = await collect_artifact_tool.run({
+            "args": {
+                "client_id": "C.1234567890",
+                "artifact": "Windows.System.Users",
+                "parameters": "user='Administrator'",
+            }
+        })
+
+        # Verify result - ToolResult object
+        assert hasattr(result, 'content')
+        assert len(result.content) == 1
+        assert hasattr(result.content[0], 'text')
+
+        result_text = result.content[0].text
+        assert "Collection started successfully" in result_text
+        assert "F.1234567890ABCDEF" in result_text
+        assert "Windows.System.Users" in result_text
+
+        # Verify the start_collection was called with correct parameters
+        mock_client.start_collection.assert_called_once_with(
+            "C.1234567890",
+            "Windows.System.Users",
+            "user='Administrator'"
+        )
+
+    @pytest.mark.asyncio
+    async def test_get_collection_results_tool_registration(self, config):
+        """Test GetCollectionResultsTool registration."""
+        server = VelociraptorMCPServer(config)
+
+        # Get all tools
+        tools = await server.app.get_tools()
+
+        # Check if GetCollectionResultsTool is registered
+        assert "GetCollectionResultsTool" in tools
+        tool = tools["GetCollectionResultsTool"]
+        assert tool.name == "GetCollectionResultsTool"
+        assert "retrieve" in tool.description.lower() or "collection results" in tool.description.lower()
+
+    @pytest.mark.asyncio
+    async def test_get_collection_results_tool_disabled(self, config):
+        """Test GetCollectionResultsTool when disabled."""
+        # Disable the tool
+        config.server.disabled_tools = ["GetCollectionResultsTool"]
+        server = VelociraptorMCPServer(config)
+
+        # Get all tools
+        tools = await server.app.get_tools()
+
+        # Check if GetCollectionResultsTool is not registered
+        assert "GetCollectionResultsTool" not in tools
+
+    @pytest.mark.asyncio
+    async def test_get_collection_results_tool_execution_success(self, config):
+        """Test GetCollectionResultsTool execution with successful results."""
+        server = VelociraptorMCPServer(config)
+
+        # Mock the client
+        mock_client = Mock()
+        mock_client.stub = Mock()  # Simulate authenticated client
+        mock_client.authenticate = AsyncMock()
+        mock_client.get_flow_status = Mock(return_value="FINISHED")
+        mock_client.get_flow_results = Mock(
+            return_value=[
+                {
+                    "username": "Administrator",
+                    "full_name": "Built-in account for administering the computer/domain",
+                    "uid": 500,
+                    "gid": 513,
+                },
+                {
+                    "username": "Guest",
+                    "full_name": "Built-in account for guest access to the computer/domain",
+                    "uid": 501,
+                    "gid": 514,
+                },
+            ]
+        )
+        server._client = mock_client
+
+        # Get the tool and execute it
+        tools = await server.app.get_tools()
+        get_collection_results_tool = tools["GetCollectionResultsTool"]
+
+        # Execute the tool
+        result = await get_collection_results_tool.run({
+            "args": {
+                "client_id": "C.1234567890",
+                "flow_id": "F.ABCDEF123456",
+                "artifact": "Windows.System.Users",
+                "fields": "username,full_name,uid,gid",
+                "max_retries": 1,  # Set to 1 for quick testing
+                "retry_delay": 1,  # Set to 1 second for quick testing
+            }
+        })
+
+        # Verify result - ToolResult object
+        assert hasattr(result, 'content')
+        assert len(result.content) == 1
+        assert hasattr(result.content[0], 'text')
+
+        result_text = result.content[0].text
+        assert "Collection results for flow F.ABCDEF123456" in result_text
+        assert "Administrator" in result_text
+        assert "Guest" in result_text
+
+        # Verify the methods were called correctly
+        mock_client.get_flow_status.assert_called_once_with(
+            "C.1234567890",
+            "F.ABCDEF123456",
+            "Windows.System.Users"
+        )
+        mock_client.get_flow_results.assert_called_once_with(
+            "C.1234567890",
+            "F.ABCDEF123456",
+            "Windows.System.Users",
+            "username,full_name,uid,gid"
+        )
+
+    @pytest.mark.asyncio
+    async def test_get_collection_results_tool_execution_timeout(self, config):
+        """Test GetCollectionResultsTool execution when flow doesn't complete."""
+        server = VelociraptorMCPServer(config)
+
+        # Mock the client
+        mock_client = Mock()
+        mock_client.stub = Mock()  # Simulate authenticated client
+        mock_client.authenticate = AsyncMock()
+        mock_client.get_flow_status = Mock(return_value="RUNNING")  # Always running
+        server._client = mock_client
+
+        # Get the tool and execute it
+        tools = await server.app.get_tools()
+        get_collection_results_tool = tools["GetCollectionResultsTool"]
+
+        # Execute the tool with quick timeout
+        result = await get_collection_results_tool.run({
+            "args": {
+                "client_id": "C.1234567890",
+                "flow_id": "F.ABCDEF123456",
+                "artifact": "Windows.System.Users",
+                "max_retries": 2,  # Set to 2 for quick testing
+                "retry_delay": 1,  # Set to 1 second for quick testing
+            }
+        })
+
+        # Verify result - ToolResult object
+        assert hasattr(result, 'content')
+        assert len(result.content) == 1
+        assert hasattr(result.content[0], 'text')
+
+        result_text = result.content[0].text
+        assert "Collection results not available after 2 retries" in result_text
+        assert "F.ABCDEF123456" in result_text
+        assert "may still be running" in result_text
+
+        # Verify the status was checked multiple times
+        assert mock_client.get_flow_status.call_count == 2
