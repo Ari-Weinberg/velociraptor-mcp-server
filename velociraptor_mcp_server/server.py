@@ -64,8 +64,8 @@ class GetCollectionResultsArgs(BaseModel):
     flow_id: str = Field(..., description="Flow ID returned from the initial collection")
     artifact: str = Field(..., description="Name of the artifact collected (e.g., Windows.NTFS.MFT)")
     fields: str = Field("*", description="Comma-separated string of fields to return (default is '*')")
-    max_retries: int = Field(10, description="Number of times to retry if the flow hasn't finished")
-    retry_delay: int = Field(30, description="Time in seconds to wait between retries")
+    max_retries: int = Field(5, description="Number of times to retry if the flow hasn't finished")
+    retry_delay: int = Field(5, description="Time in seconds to wait between retries")
 
 
 class CollectArtifactDetailsArgs(BaseModel):
