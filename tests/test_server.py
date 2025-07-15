@@ -944,3 +944,95 @@ class TestVelociraptorMCPServer:
         mock_client.run_vql_query.assert_called_once_with(
             "SELECT name,description,parameters,sources.name as source_names FROM artifact_definitions() WHERE name = 'NonExistent.Artifact'"
         )
+
+    @pytest.mark.asyncio
+    async def test_get_collection_results_tool_execution_partial_results(self, config):
+        """Test GetCollectionResultsTool execution with partial results when some sources timeout."""
+        server = VelociraptorMCPServer(config)
+
+        # Mock the client
+        mock_client = Mock()
+        mock_client.stub = Mock()  # Simulate authenticated client
+        mock_client.authenticate = AsyncMock()
+
+        # Mock run_vql_query for artifact details with multiple sources
+        mock_client.run_vql_query = Mock(
+            return_value=[
+                {
+                    "name": "Linux.Debian.Packages",
+                    "source_names": ["DebPackages", "Snaps"]  # Multiple sources
+                }
+            ]
+        )
+
+        # Mock get_flow_status to simulate one source finishing and one still running
+        def mock_get_flow_status(client_id, flow_id, artifact_name):
+            if "DebPackages" in artifact_name:
+                return "FINISHED"  # DebPackages source finishes
+            elif "Snaps" in artifact_name:
+                return "RUNNING"   # Snaps source keeps running
+            return "RUNNING"
+
+        mock_client.get_flow_status = Mock(side_effect=mock_get_flow_status)
+
+        # Mock get_flow_results to return data for the finished source
+        def mock_get_flow_results(client_id, flow_id, artifact_name, fields):
+            if "DebPackages" in artifact_name:
+                return [
+                    {"package": "vim", "version": "8.2", "architecture": "amd64"},
+                    {"package": "curl", "version": "7.68", "architecture": "amd64"}
+                ]
+            return []
+
+        mock_client.get_flow_results = Mock(side_effect=mock_get_flow_results)
+        server._client = mock_client
+
+        # Get the tool and execute it
+        tools = await server.app.get_tools()
+        get_collection_results_tool = tools["GetCollectionResultsTool"]
+
+        # Execute the tool with low retry count to trigger partial results
+        result = await get_collection_results_tool.run({
+            "args": {
+                "client_id": "C.1234567890",
+                "flow_id": "F.ABCDEF123456",
+                "artifact": "Linux.Debian.Packages",
+                "fields": "*",
+                "max_retries": 1,  # Low retry count to trigger timeout
+                "retry_delay": 1,
+            }
+        })
+
+        # Verify result - ToolResult object
+        assert hasattr(result, 'content')
+        assert len(result.content) == 1
+        assert hasattr(result.content[0], 'text')
+
+        result_text = result.content[0].text
+        assert "Collection results for flow F.ABCDEF123456" in result_text
+        assert "with partial results" in result_text
+        assert "WARNING: Partial results returned after timeout" in result_text
+        assert "Completed 1/2 sources" in result_text
+        assert "Incomplete sources: Linux.Debian.Packages/Snaps" in result_text
+        assert "DebPackages" in result_text  # Should have results from finished source
+        assert "vim" in result_text  # Verify actual data is included
+        assert "curl" in result_text
+
+        # Verify the methods were called correctly
+        mock_client.run_vql_query.assert_called_once_with(
+            "SELECT name,sources.name as source_names FROM artifact_definitions() WHERE name = 'Linux.Debian.Packages'"
+        )
+
+        # Verify get_flow_status was called for both sources
+        assert mock_client.get_flow_status.call_count >= 2  # Called at least twice (once per source)
+        mock_client.get_flow_status.assert_any_call(
+            "C.1234567890", "F.ABCDEF123456", "Linux.Debian.Packages/DebPackages"
+        )
+        mock_client.get_flow_status.assert_any_call(
+            "C.1234567890", "F.ABCDEF123456", "Linux.Debian.Packages/Snaps"
+        )
+
+        # Verify get_flow_results was called only for the finished source
+        mock_client.get_flow_results.assert_called_once_with(
+            "C.1234567890", "F.ABCDEF123456", "Linux.Debian.Packages/DebPackages", "*"
+        )
