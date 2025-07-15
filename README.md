@@ -83,9 +83,7 @@ MCP_SERVER_PORT=8000
 LOG_LEVEL=INFO
 
 # Tool Filtering (optional)
-# VELOCIRAPTOR_DISABLED_TOOLS=DeleteArtifactTool,RestartServerTool
-# VELOCIRAPTOR_DISABLED_CATEGORIES=dangerous,write
-# VELOCIRAPTOR_READ_ONLY=false
+# VELOCIRAPTOR_DISABLED_TOOLS=CollectArtifactTool,RunVQLQueryTool
 ```
 
 **Note**: For `VELOCIRAPTOR_API_KEY`, provide the full path to your Velociraptor `api.config.yaml` file. You can generate this file from your Velociraptor server using the admin interface or CLI.
@@ -112,8 +110,9 @@ The server will start and be available at `http://127.0.0.1:8000` (or your confi
 ### Requirements
 
 - Python 3.11 or higher
-- Access to a Wazuh Manager instance
-- Network connectivity to your Wazuh Manager
+- Access to a Velociraptor server instance
+- Network connectivity to your Velociraptor server
+- Velociraptor API configuration file (api.config.yaml)
 
 ### Development Installation
 
@@ -140,17 +139,13 @@ pre-commit install
 
 | Variable | Description | Default | Required |
 |----------|-------------|---------|----------|
-| `WAZUH_PROD_URL` | Wazuh Manager API URL | None | ✅ |
-| `WAZUH_PROD_USERNAME` | Wazuh username | None | ✅ |
-| `WAZUH_PROD_PASSWORD` | Wazuh password | None | ✅ |
-| `WAZUH_PROD_SSL_VERIFY` | SSL verification | `true` | ❌ |
-| `WAZUH_PROD_TIMEOUT` | Request timeout (seconds) | `30` | ❌ |
+| `VELOCIRAPTOR_API_KEY` | Path to Velociraptor API config file (api.config.yaml) | None | ✅ |
+| `VELOCIRAPTOR_SSL_VERIFY` | SSL verification | `true` | ❌ |
+| `VELOCIRAPTOR_TIMEOUT` | Request timeout (seconds) | `30` | ❌ |
 | `MCP_SERVER_HOST` | Server host | `127.0.0.1` | ❌ |
 | `MCP_SERVER_PORT` | Server port | `8000` | ❌ |
 | `LOG_LEVEL` | Logging level | `INFO` | ❌ |
-| `WAZUH_DISABLED_TOOLS` | Comma-separated list of disabled tools | None | ❌ |
-| `WAZUH_DISABLED_CATEGORIES` | Comma-separated list of disabled categories | None | ❌ |
-| `WAZUH_READ_ONLY` | Enable read-only mode | `false` | ❌ |
+| `VELOCIRAPTOR_DISABLED_TOOLS` | Comma-separated list of disabled tools | None | ❌ |
 
 ### CLI Options
 
@@ -162,9 +157,7 @@ Available options:
 - `--host`: Host to bind server to (default: 127.0.0.1)
 - `--port`: Port to bind server to (default: 8000)
 - `--log-level`: Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
-- `--wazuh-url`: Wazuh Manager URL (overrides env var)
-- `--wazuh-username`: Wazuh username (overrides env var)
-- `--wazuh-password`: Wazuh password (overrides env var)
+- `--config`: Path to Velociraptor API config file (overrides env var)
 - `--no-ssl-verify`: Disable SSL certificate verification
 
 ---
@@ -187,14 +180,13 @@ server.start()
 ### Custom Configuration
 
 ```python
-from velociraptor_mcp_server.config import WazuhConfig, ServerConfig, Config
+from velociraptor_mcp_server.config import VelociraptorConfig, ServerConfig, Config
 
 # Create custom configuration
-wazuh_config = WazuhConfig(
-    url="https://your-wazuh-manager:55000",
-    username="admin",
-    password="password",
-    ssl_verify=False
+velociraptor_config = VelociraptorConfig(
+    api_key="/path/to/api.config.yaml",
+    ssl_verify=False,
+    timeout=60
 )
 
 server_config = ServerConfig(
@@ -203,7 +195,7 @@ server_config = ServerConfig(
     log_level="DEBUG"
 )
 
-config = Config(wazuh=wazuh_config, server=server_config)
+config = Config(velociraptor=velociraptor_config, server=server_config)
 server = create_server(config)
 ```
 
@@ -217,7 +209,7 @@ from langchain.agents import AgentType, initialize_agent
 # Initialize LLM
 model = ChatOpenAI(model="gpt-4")
 
-# Connect to Wazuh MCP server
+# Connect to Velociraptor MCP server
 client = MultiServerMCPClient({
     "velociraptor-mcp-server": {
         "transport": "sse",
@@ -234,14 +226,19 @@ agent = initialize_agent(
     verbose=True
 )
 
-# Query your Wazuh data
+# Query your Velociraptor data
 response = await agent.ainvoke({
-    "input": "Show me all active agents and their status"
+    "input": "Show me all active Velociraptor clients and their OS information"
 })
 
-# Get network ports information
-ports_response = await agent.ainvoke({
-    "input": "Show me all listening TCP ports on agent 000"
+# Collect artifacts from a specific client
+artifact_response = await agent.ainvoke({
+    "input": "Collect Windows.System.Users artifact from client workstation-01"
+})
+
+# Get artifact collection results
+results_response = await agent.ainvoke({
+    "input": "Get the results from flow F.ABC123 for Windows.System.Users artifact"
 })
 ```
 
@@ -249,129 +246,115 @@ ports_response = await agent.ainvoke({
 
 ## Available Tools
 
-The server exposes the following MCP tools:
+The server exposes the following MCP tools for Velociraptor integration:
 
 ### 1. AuthenticateTool
-- **Purpose**: Force JWT token refresh from Wazuh Manager
+- **Purpose**: Initialize and test connection to Velociraptor server
 - **Parameters**: None
-- **Usage**: Ensures fresh authentication tokens
+- **Usage**: Establishes a gRPC connection using the api.config.yaml file and tests authentication
+- **Example**:
+  ```json
+  {"args": {}}
+  ```
 
-### 2. GetAgentsTool
-- **Purpose**: Retrieve agents from Wazuh Manager with filtering
+### 2. GetAgentInfo
+- **Purpose**: Retrieve detailed information about a Velociraptor client by hostname or FQDN
 - **Parameters**:
-  - `status` (optional): Filter by agent status (e.g., ["active"])
-  - `limit` (optional): Maximum number of agents to return (default: 500)
-  - `offset` (optional): Offset for pagination (default: 0)
+  - `hostname` (required): Hostname or FQDN of the client to search for
+- **Usage**: Searches for a client and returns comprehensive details including client ID, OS information, agent version, and connection status
+- **Example**:
+  ```json
+  {"args": {"hostname": "workstation-01"}}
+  {"args": {"hostname": "server.domain.com"}}
+  ```
 
-
-### 3. GetAgentPortsTool
-- **Purpose**: Get network ports information from a specific agent using syscollector
+### 3. RunVQLQueryTool
+- **Purpose**: Execute VQL (Velociraptor Query Language) queries on the Velociraptor server
 - **Parameters**:
-  - `agent_id` (required): Agent ID to get ports from
-  - `limit` (optional): Maximum number of ports to return (default: 500)
-  - `offset` (optional): Offset for pagination (default: 0)
-  - `protocol` (optional): Filter by protocol (tcp, udp)
-  - `local_ip` (optional): Filter by local IP address
-  - `local_port` (optional): Filter by local port
-  - `remote_ip` (optional): Filter by remote IP address
-  - `state` (optional): Filter by state (listening, established, etc.)
-  - `process` (optional): Filter by process name
-  - `pid` (optional): Filter by process ID
-  - `tx_queue` (optional): Filter by tx_queue
-  - `sort` (optional): Sort results by field(s)
-  - `search` (optional): Search for elements containing the specified string
-  - `select` (optional): Select which fields to return
-  - `q` (optional): Query to filter results by
-  - `distinct` (optional): Look for distinct values
+  - `vql` (required): VQL query string to execute
+  - `max_rows` (optional): Maximum number of rows to return
+  - `timeout` (optional): Query timeout in seconds
+- **Usage**: Allows custom VQL queries to retrieve information about clients, artifacts, hunts, flows, and more
+- **Examples**:
+  ```json
+  {"args": {"vql": "SELECT client_id, os_info.hostname FROM clients() LIMIT 10"}}
+  {"args": {"vql": "SELECT * FROM flows() WHERE client_id = 'C.1234567890'"}}
+  {"args": {"vql": "SELECT name, description FROM artifacts() WHERE name =~ 'Windows'"}}
+  ```
 
-### 4. GetAgentPackagesTool
-- **Purpose**: Get installed packages information from a specific agent using syscollector
-- **Parameters**:
-  - `agent_id` (required): Agent ID to get packages from
-  - `limit` (optional): Maximum number of packages to return (default: 500)
-  - `offset` (optional): Offset for pagination (default: 0)
-  - `vendor` (optional): Filter by package vendor
-  - `name` (optional): Filter by package name
-  - `architecture` (optional): Filter by package architecture
-  - `format` (optional): Filter by package format (e.g., 'deb', 'rpm')
-  - `version` (optional): Filter by package version
-  - `sort` (optional): Sort results by field(s)
-  - `search` (optional): Search for elements containing the specified string
-  - `select` (optional): Select which fields to return
-  - `q` (optional): Query to filter results by
-  - `distinct` (optional): Look for distinct values
+### 4. ListLinuxArtifactsTool
+- **Purpose**: List available Linux artifacts in Velociraptor
+- **Parameters**: None
+- **Usage**: Returns a summary of all Linux client artifacts including names, descriptions, and required parameters
+- **Example**:
+  ```json
+  {"args": {}}
+  ```
 
-### 5. GetAgentProcessesTool
-- **Purpose**: Get running processes information from a specific agent using syscollector
-- **Parameters**:
-  - `agent_id` (required): Agent ID to get processes from
-  - `limit` (optional): Maximum number of processes to return (default: 500)
-  - `offset` (optional): Offset for pagination (default: 0)
-  - `pid` (optional): Filter by process PID
-  - `state` (optional): Filter by process state
-  - `ppid` (optional): Filter by process parent PID
-  - `egroup` (optional): Filter by process egroup
-  - `euser` (optional): Filter by process euser
-  - `fgroup` (optional): Filter by process fgroup
-  - `name` (optional): Filter by process name
-  - `nlwp` (optional): Filter by process nlwp
-  - `pgrp` (optional): Filter by process pgrp
-  - `priority` (optional): Filter by process priority
-  - `rgroup` (optional): Filter by process rgroup
-  - `ruser` (optional): Filter by process ruser
-  - `sgroup` (optional): Filter by process sgroup
-  - `suser` (optional): Filter by process suser
-  - `sort` (optional): Sort results by field(s)
-  - `search` (optional): Search for elements containing the specified string
-  - `select` (optional): Select which fields to return
-  - `q` (optional): Query to filter results by
-  - `distinct` (optional): Look for distinct values
+### 5. ListWindowsArtifactsTool
+- **Purpose**: List available Windows artifacts in Velociraptor
+- **Parameters**: None
+- **Usage**: Returns a summary of all Windows client artifacts including names, descriptions, and required parameters. Includes performance notes for NTFS queries (MFT, USN) and path filtering recommendations.
+- **Example**:
+  ```json
+  {"args": {}}
+  ```
 
-### 6. ListRulesTool
-- **Purpose**: List rules from Wazuh Manager with various filtering options
+### 6. CollectArtifactTool
+- **Purpose**: Collect a Velociraptor artifact from a client
 - **Parameters**:
-  - `rule_ids` (optional): List of rule IDs to filter by
-  - `limit` (optional): Maximum number of rules to return (default: 500)
-  - `offset` (optional): Offset for pagination (default: 0)
-  - `select` (optional): Select which fields to return
-  - `sort` (optional): Sort results by field(s)
-  - `search` (optional): Search for elements containing the specified string
-  - `q` (optional): Query to filter results by
-  - `status` (optional): Filter by status (enabled, disabled, all)
-  - `group` (optional): Filter by rule group
-  - `level` (optional): Filter by rule level (e.g., '4' or '2-4')
-  - `filename` (optional): Filter by filename
-  - `relative_dirname` (optional): Filter by relative directory name
-  - `pci_dss` (optional): Filter by PCI_DSS requirement
-  - `gdpr` (optional): Filter by GDPR requirement
-  - `gpg13` (optional): Filter by GPG13 requirement
-  - `hipaa` (optional): Filter by HIPAA requirement
-  - `nist_800_53` (optional): Filter by NIST-800-53 requirement
-  - `tsc` (optional): Filter by TSC requirement
-  - `mitre` (optional): Filter by MITRE technique ID
-  - `distinct` (optional): Look for distinct values
+  - `client_id` (required): Velociraptor client ID to target for collection
+  - `artifact` (required): Name of the Velociraptor artifact to collect
+  - `parameters` (optional): Comma-separated string of key='value' pairs to pass to the artifact
+- **Usage**: Initiates artifact collection on a target client and returns a flow_id for tracking
+- **Examples**:
+  ```json
+  {"args": {"client_id": "C.1234567890", "artifact": "Windows.System.Users"}}
+  {"args": {"client_id": "C.0987654321", "artifact": "Linux.System.Uptime", "parameters": "format='seconds'"}}
+  ```
 
-### 7. GetRuleFileContentTool
-- **Purpose**: Get the content of a specific rule file from the ruleset
+### 7. GetCollectionResultsTool
+- **Purpose**: Retrieve Velociraptor collection results for a given client, flow ID, and artifact
 - **Parameters**:
-  - `filename` (required): Filename of the rule file to get content from
-  - `raw` (optional): Format response in plain text (default: false)
-  - `relative_dirname` (optional): Filter by relative directory name
+  - `client_id` (required): Velociraptor client ID where the collection was run
+  - `flow_id` (required): Flow ID returned from the initial collection
+  - `artifact` (required): Name of the artifact collected (e.g., Windows.NTFS.MFT)
+  - `fields` (optional): Comma-separated string of fields to return (default: '*')
+  - `max_retries` (optional): Number of times to retry if the flow hasn't finished (default: 5)
+  - `retry_delay` (optional): Time in seconds to wait between retries (default: 5)
+- **Usage**: Waits and retries if the flow hasn't finished or if no results are immediately available. Supports partial results for multi-source artifacts.
+- **Features**:
+  - **Multi-source support**: Handles artifacts with multiple sources (e.g., Linux.Debian.Packages with DebPackages/Snaps)
+  - **Partial results**: Returns completed sources even if others are still running
+  - **Intelligent retry**: Automatically waits for collection completion
+- **Examples**:
+  ```json
+  {"args": {"client_id": "C.1234567890", "flow_id": "F.ABC123", "artifact": "Windows.System.Users"}}
+  {"args": {"client_id": "C.0987654321", "flow_id": "F.DEF456", "artifact": "Linux.System.Uptime", "fields": "Uptime,BootTime"}}
+  ```
 
-### 8. GetAgentSCATool
-- **Purpose**: Get Security Configuration Assessment (SCA) results for a specific agent
+### 8. CollectArtifactDetailsTool
+- **Purpose**: Get detailed information about a specific Velociraptor artifact
 - **Parameters**:
-  - `agent_id` (required): Agent ID to get SCA results from
-  - `name` (optional): Filter by policy name
-  - `description` (optional): Filter by policy description
-  - `references` (optional): Filter by references
-  - `limit` (optional): Maximum number of SCA policies to return (default: 500)
-  - `offset` (optional): Offset for pagination (default: 0)
-  - `sort` (optional): Sort results by field(s)
-  - `search` (optional): Search for elements containing the specified string
-  - `select` (optional): Select which fields to return
-  - `q` (optional): Query to filter results by
-  - `distinct` (optional): Look for distinct values
+  - `artifact_name` (required): Name of the artifact to get details for
+- **Usage**: Retrieves comprehensive details including description, parameters, source code/VQL, parameter types, and default values. Useful for understanding artifacts before collection or debugging issues.
+- **Examples**:
+  ```json
+  {"args": {"artifact_name": "Windows.System.Users"}}
+  {"args": {"artifact_name": "Linux.Network.Netstat"}}
+  {"args": {"artifact_name": "Windows.NTFS.MFT"}}
+  ```
+
+### Artifact Collection Workflow
+
+The tools work together to provide a complete artifact collection workflow:
+
+1. **Discovery**: Use `ListLinuxArtifactsTool` or `ListWindowsArtifactsTool` to explore available artifacts
+2. **Investigation**: Use `CollectArtifactDetailsTool` to understand artifact parameters and requirements
+3. **Client Identification**: Use `GetAgentInfo` to find the target client by hostname
+4. **Collection**: Use `CollectArtifactTool` to start artifact collection and get a flow_id
+5. **Results**: Use `GetCollectionResultsTool` to monitor progress and retrieve results
+6. **Custom Queries**: Use `RunVQLQueryTool` for advanced custom investigations
 
 ---
 
@@ -459,18 +442,18 @@ Visit the [Actions page](https://github.com/socfortress/velociraptor-mcp-server/
 
 ### Credentials Management
 - **Never commit credentials**: Use environment variables or secrets management
-- **Use strong passwords**: Ensure Wazuh credentials are secure
-- **Rotate tokens**: Regularly update API credentials
+- **Secure API config**: Protect your Velociraptor API configuration file (api.config.yaml)
+- **Certificate security**: Ensure proper handling of client certificates and private keys
 
 ### Network Security
-- **TLS/SSL**: Always use HTTPS in production (`WAZUH_PROD_SSL_VERIFY=true`)
+- **TLS/SSL**: Always use SSL/TLS for gRPC connections (`VELOCIRAPTOR_SSL_VERIFY=true`)
 - **Firewall rules**: Restrict access to necessary ports only
 - **VPN/Private networks**: Deploy in secured network environments
 
 ### Access Control
-- **Least privilege**: Create dedicated Wazuh users with minimal required permissions
-- **Read-only mode**: Use `WAZUH_READ_ONLY=true` when write operations aren't needed
-- **Tool filtering**: Disable unnecessary tools using `WAZUH_DISABLED_TOOLS`
+- **Least privilege**: Use Velociraptor API keys with minimal required permissions
+- **Tool filtering**: Disable unnecessary tools using `VELOCIRAPTOR_DISABLED_TOOLS`
+- **Client access**: Restrict which clients can be accessed through the API
 
 ### Monitoring
 - **Logging**: Enable appropriate log levels for monitoring
@@ -486,7 +469,7 @@ velociraptor-mcp-server/
 ├── velociraptor_mcp_server/          # Main package
 │   ├── __init__.py           # Package initialization
 │   ├── __main__.py           # CLI entry point
-│   ├── client.py             # Wazuh API client
+│   ├── client.py             # Velociraptor API client
 │   ├── config.py             # Configuration management
 │   ├── server.py             # MCP server implementation
 │   └── exceptions.py         # Custom exceptions
@@ -539,11 +522,12 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ### v0.1.0 (Latest)
 - Initial release
 - Basic MCP server functionality
-- Wazuh API integration with JWT authentication
+- Velociraptor API integration with gRPC authentication
+- Complete artifact collection workflow
 - CLI interface with configuration options
-- Docker and Kubernetes deployment support
 - Comprehensive test suite
 - GitHub Actions CI/CD pipeline
+- Support for multi-source artifacts with partial results
 
 ---
 
