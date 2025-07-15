@@ -632,3 +632,114 @@ class TestVelociraptorMCPServer:
 
         # Verify the status was checked multiple times
         assert mock_client.get_flow_status.call_count == 2
+
+    @pytest.mark.asyncio
+    async def test_collect_artifact_details_tool_registration(self, config):
+        """Test CollectArtifactDetailsTool registration."""
+        server = VelociraptorMCPServer(config)
+
+        # Get all tools
+        tools = await server.app.get_tools()
+
+        # Check if CollectArtifactDetailsTool is registered
+        assert "CollectArtifactDetailsTool" in tools
+        tool = tools["CollectArtifactDetailsTool"]
+        assert tool.name == "CollectArtifactDetailsTool"
+        assert "detailed information" in tool.description.lower()
+
+    @pytest.mark.asyncio
+    async def test_collect_artifact_details_tool_disabled(self, config):
+        """Test CollectArtifactDetailsTool when disabled."""
+        # Disable the tool
+        config.server.disabled_tools = ["CollectArtifactDetailsTool"]
+        server = VelociraptorMCPServer(config)
+
+        # Get all tools
+        tools = await server.app.get_tools()
+
+        # Check if CollectArtifactDetailsTool is not registered
+        assert "CollectArtifactDetailsTool" not in tools
+
+    @pytest.mark.asyncio
+    async def test_collect_artifact_details_tool_execution_success(self, config):
+        """Test CollectArtifactDetailsTool execution with successful result."""
+        server = VelociraptorMCPServer(config)
+
+        # Mock the client
+        mock_client = Mock()
+        mock_client.stub = Mock()  # Simulate authenticated client
+        mock_client.authenticate = AsyncMock()
+        mock_client.run_vql_query = Mock(
+            return_value=[
+                {
+                    "name": "Windows.System.Users",
+                    "description": "Collect user account information from Windows systems including user profiles, group memberships, and account settings.",
+                    "parameters": [
+                        {"name": "UserFilter", "description": "Filter users by name pattern"},
+                        {"name": "IncludeGroups", "description": "Include group memberships"}
+                    ],
+                    "source": "SELECT * FROM Artifact.Windows.Sys.Users(UserFilter=UserFilter, IncludeGroups=IncludeGroups)\nLET UserFilter <= '.*'\nLET IncludeGroups <= TRUE"
+                }
+            ]
+        )
+        server._client = mock_client
+
+        # Get the tool and execute it
+        tools = await server.app.get_tools()
+        collect_artifact_details_tool = tools["CollectArtifactDetailsTool"]
+
+        # Execute the tool
+        result = await collect_artifact_details_tool.run({
+            "args": {"artifact_name": "Windows.System.Users"}
+        })
+
+        # Verify result - ToolResult object
+        assert hasattr(result, 'content')
+        assert len(result.content) == 1
+        assert hasattr(result.content[0], 'text')
+
+        result_text = result.content[0].text
+        assert "Artifact details for 'Windows.System.Users'" in result_text
+        assert "Windows.System.Users" in result_text
+        assert "Collect user account information" in result_text
+        assert "UserFilter" in result_text
+        assert "IncludeGroups" in result_text
+
+        # Verify the VQL query was called with correct parameters
+        mock_client.run_vql_query.assert_called_once_with(
+            "SELECT name,description,parameters,source FROM artifact_definitions() WHERE name = 'Windows.System.Users'"
+        )
+
+    @pytest.mark.asyncio
+    async def test_collect_artifact_details_tool_execution_not_found(self, config):
+        """Test CollectArtifactDetailsTool execution when artifact not found."""
+        server = VelociraptorMCPServer(config)
+
+        # Mock the client
+        mock_client = Mock()
+        mock_client.stub = Mock()  # Simulate authenticated client
+        mock_client.authenticate = AsyncMock()
+        mock_client.run_vql_query = Mock(return_value=[])  # Empty result
+        server._client = mock_client
+
+        # Get the tool and execute it
+        tools = await server.app.get_tools()
+        collect_artifact_details_tool = tools["CollectArtifactDetailsTool"]
+
+        # Execute the tool
+        result = await collect_artifact_details_tool.run({
+            "args": {"artifact_name": "NonExistent.Artifact"}
+        })
+
+        # Verify result - ToolResult object
+        assert hasattr(result, 'content')
+        assert len(result.content) == 1
+        assert hasattr(result.content[0], 'text')
+
+        result_text = result.content[0].text
+        assert "No artifact found with name: NonExistent.Artifact" in result_text
+
+        # Verify the VQL query was called
+        mock_client.run_vql_query.assert_called_once_with(
+            "SELECT name,description,parameters,source FROM artifact_definitions() WHERE name = 'NonExistent.Artifact'"
+        )

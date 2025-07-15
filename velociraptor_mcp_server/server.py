@@ -68,6 +68,12 @@ class GetCollectionResultsArgs(BaseModel):
     retry_delay: int = Field(30, description="Time in seconds to wait between retries")
 
 
+class CollectArtifactDetailsArgs(BaseModel):
+    """Arguments for getting detailed artifact information."""
+
+    artifact_name: str = Field(..., description="Name of the artifact to get details for (e.g., Windows.System.Users)")
+
+
 class VelociraptorMCPServer:
     """Main MCP server for Velociraptor integration."""
 
@@ -505,6 +511,83 @@ class VelociraptorMCPServer:
                 except Exception as e:
                     logger.error("Failed to get collection results: %s", e)
                     return [{"type": "text", "text": f"Error getting collection results: {str(e)}"}]
+
+        if "CollectArtifactDetailsTool" not in self.config.server.disabled_tools:
+
+            @self.app.tool(
+                name="CollectArtifactDetailsTool",
+                description="Get detailed information about a specific Velociraptor artifact including its description, parameters, and source code. This tool helps you understand what an artifact does and what parameters it requires before collection.",
+            )
+            async def collect_artifact_details_tool(args: CollectArtifactDetailsArgs):
+                """Get detailed information about a specific Velociraptor artifact.
+
+                This tool retrieves comprehensive details about a specific artifact including:
+                - Full description of what the artifact does
+                - All available parameters and their descriptions
+                - Source code/VQL that defines the artifact
+                - Parameter types and default values
+
+                This is useful for understanding an artifact before collecting it, or for
+                debugging collection issues.
+
+                Args:
+                    args: An object containing:
+                        - artifact_name (required): Name of the artifact to get details for
+
+                Example usage:
+                    {"args": {"artifact_name": "Windows.System.Users"}}
+                    {"args": {"artifact_name": "Linux.Network.Netstat"}}
+                    {"args": {"artifact_name": "Windows.NTFS.MFT"}}
+
+                Returns:
+                    JSON object with detailed artifact information including description, parameters, and source.
+                """
+                try:
+                    client = self._get_client()
+
+                    # Ensure client is authenticated
+                    if client.stub is None:
+                        await client.authenticate()
+
+                    # Execute the VQL query to get artifact details
+                    vql = f"SELECT name,description,parameters,sources.name as source_names FROM artifact_definitions() WHERE name = '{args.artifact_name}'"
+                    results = client.run_vql_query(vql)
+
+                    if not results:
+                        return [
+                            {
+                                "type": "text",
+                                "text": f"No artifact found with name: {args.artifact_name}",
+                            },
+                        ]
+
+                    # Get the first (and should be only) result
+                    artifact_details = results[0]
+
+                    # Get source names - this is already a list of strings
+                    source_names = artifact_details.get("source_names", [])
+
+                    # Format the response for better readability
+                    formatted_details = {
+                        "name": artifact_details.get("name", ""),
+                        "description": artifact_details.get("description", ""),
+                        "parameters": artifact_details.get("parameters", []),
+                        "source_names": source_names,
+                        "source_count": len(source_names) if source_names else 0
+                    }
+
+                    response_text = json.dumps(formatted_details, indent=2)
+
+                    return [
+                        {
+                            "type": "text",
+                            "text": f"Artifact details for '{args.artifact_name}':\n{response_text}",
+                        },
+                    ]
+
+                except Exception as e:
+                    logger.error("Failed to get artifact details: %s", e)
+                    return [{"type": "text", "text": f"Error getting artifact details: {str(e)}"}]
 
     def _safe_truncate(self, text: str, max_length: int = 32000) -> str:
         """Truncate text to avoid overwhelming the client."""
