@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Integration script to connect to Wazuh MCP Server from LangChain.
+Integration script to connect to Velociraptor MCP Server from LangChain.
 """
 
 import asyncio
