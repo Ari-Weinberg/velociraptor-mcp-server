@@ -42,7 +42,7 @@ async def main():
     print("\n=== Testing Get Agents ===")
     await agent.ainvoke(
         {
-            "input": "What Windows artifact names pertain to RDP?",
+            "input": "What Windows artifact names pertain to RDP and what parameters do they accept?",
         },
     )
 
