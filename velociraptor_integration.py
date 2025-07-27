@@ -42,7 +42,7 @@ async def main():
     print("\n=== Testing Get Agents ===")
     await agent.ainvoke(
         {
-            "input": "can you give me all network connections on the piHole agent and look for suspicious processes?",
+            "input": "What Windows artifact names pertain to RDP?",
         },
     )
 

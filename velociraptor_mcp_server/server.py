@@ -36,6 +36,14 @@ class RunVQLQueryArgs(BaseModel):
     max_rows: Optional[int] = Field(None, description="Maximum number of rows to return")
     timeout: Optional[int] = Field(None, description="Query timeout in seconds")
 
+class ListLinuxArtifactNamesArgs(BaseModel):
+    """Arguments for listing only Linux artifact names (no parameters needed)."""
+    pass
+
+class ListWindowsArtifactNamesArgs(BaseModel):
+    """Arguments for listing only Windows artifact names (no parameters needed)."""
+    pass
+
 
 class ListLinuxArtifactsArgs(BaseModel):
     """Arguments for listing Linux artifacts (no parameters needed)."""
@@ -242,6 +250,46 @@ class VelociraptorMCPServer:
                 except Exception as e:
                     logger.error("Failed to execute VQL query: %s", e)
                     return [{"type": "text", "text": f"Error executing VQL query: {str(e)}"}]
+
+        if "ListLinuxArtifactNamesTool" not in self.config.server.disabled_tools:
+            @self.app.tool(
+                name="ListLinuxArtifactNamesTool",
+                description="List only the names of available Linux artifacts in Velociraptor. This tool returns a simple list of artifact names for Linux client artifacts.",
+            )
+            async def list_linux_artifact_names_tool(args: ListLinuxArtifactNamesArgs):
+                """List only the names of available Linux artifacts."""
+                try:
+                    client = self._get_client()
+                    if client.stub is None:
+                        await client.authenticate()
+                    vql = "SELECT name FROM artifact_definitions() WHERE type =~ 'client' AND name =~ 'linux\\.'"
+                    results = client.run_vql_query(vql)
+                    names = [r["name"] for r in results if "name" in r]
+                    response_text = json.dumps(names, indent=2)
+                    return [{"type": "text", "text": self._safe_truncate(response_text)}]
+                except Exception as e:
+                    logger.error("Failed to list Linux artifact names: %s", e)
+                    return [{"type": "text", "text": f"Error listing Linux artifact names: {str(e)}"}]
+
+        if "ListWindowsArtifactNamesTool" not in self.config.server.disabled_tools:
+            @self.app.tool(
+                name="ListWindowsArtifactNamesTool",
+                description="List only the names of available Windows artifacts in Velociraptor. This tool returns a simple list of artifact names for Windows client artifacts.",
+            )
+            async def list_windows_artifact_names_tool(args: ListWindowsArtifactNamesArgs):
+                """List only the names of available Windows artifacts."""
+                try:
+                    client = self._get_client()
+                    if client.stub is None:
+                        await client.authenticate()
+                    vql = "SELECT name FROM artifact_definitions() WHERE type =~ 'client' AND name =~ '^windows\\.'"
+                    results = client.run_vql_query(vql)
+                    names = [r["name"] for r in results if "name" in r]
+                    response_text = json.dumps(names, indent=2)
+                    return [{"type": "text", "text": self._safe_truncate(response_text)}]
+                except Exception as e:
+                    logger.error("Failed to list Windows artifact names: %s", e)
+                    return [{"type": "text", "text": f"Error listing Windows artifact names: {str(e)}"}]
 
         if "ListLinuxArtifactsTool" not in self.config.server.disabled_tools:
 
