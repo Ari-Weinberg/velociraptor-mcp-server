@@ -37,6 +37,18 @@ class RunVQLQueryArgs(BaseModel):
     timeout: Optional[int] = Field(None, description="Query timeout in seconds")
 
 
+class ListLinuxArtifactNamesArgs(BaseModel):
+    """Arguments for listing only Linux artifact names (no parameters needed)."""
+
+    pass
+
+
+class ListWindowsArtifactNamesArgs(BaseModel):
+    """Arguments for listing only Windows artifact names (no parameters needed)."""
+
+    pass
+
+
 class ListLinuxArtifactsArgs(BaseModel):
     """Arguments for listing Linux artifacts (no parameters needed)."""
 
@@ -243,6 +255,52 @@ class VelociraptorMCPServer:
                     logger.error("Failed to execute VQL query: %s", e)
                     return [{"type": "text", "text": f"Error executing VQL query: {str(e)}"}]
 
+        if "ListLinuxArtifactNamesTool" not in self.config.server.disabled_tools:
+
+            @self.app.tool(
+                name="ListLinuxArtifactNamesTool",
+                description="List only the names of available Linux artifacts in Velociraptor. This tool returns a simple list of artifact names for Linux client artifacts.",
+            )
+            async def list_linux_artifact_names_tool(args: ListLinuxArtifactNamesArgs):
+                """List only the names of available Linux artifacts."""
+                try:
+                    client = self._get_client()
+                    if client.stub is None:
+                        await client.authenticate()
+                    vql = "SELECT name FROM artifact_definitions() WHERE type =~ 'client' AND name =~ 'linux\\.'"
+                    results = client.run_vql_query(vql)
+                    names = [r["name"] for r in results if "name" in r]
+                    response_text = json.dumps(names, indent=2)
+                    return [{"type": "text", "text": self._safe_truncate(response_text)}]
+                except Exception as e:
+                    logger.error("Failed to list Linux artifact names: %s", e)
+                    return [
+                        {"type": "text", "text": f"Error listing Linux artifact names: {str(e)}"},
+                    ]
+
+        if "ListWindowsArtifactNamesTool" not in self.config.server.disabled_tools:
+
+            @self.app.tool(
+                name="ListWindowsArtifactNamesTool",
+                description="List only the names of available Windows artifacts in Velociraptor. This tool returns a simple list of artifact names for Windows client artifacts.",
+            )
+            async def list_windows_artifact_names_tool(args: ListWindowsArtifactNamesArgs):
+                """List only the names of available Windows artifacts."""
+                try:
+                    client = self._get_client()
+                    if client.stub is None:
+                        await client.authenticate()
+                    vql = "SELECT name FROM artifact_definitions() WHERE type =~ 'client' AND name =~ '^windows\\.'"
+                    results = client.run_vql_query(vql)
+                    names = [r["name"] for r in results if "name" in r]
+                    response_text = json.dumps(names, indent=2)
+                    return [{"type": "text", "text": self._safe_truncate(response_text)}]
+                except Exception as e:
+                    logger.error("Failed to list Windows artifact names: %s", e)
+                    return [
+                        {"type": "text", "text": f"Error listing Windows artifact names: {str(e)}"},
+                    ]
+
         if "ListLinuxArtifactsTool" not in self.config.server.disabled_tools:
 
             @self.app.tool(
@@ -370,6 +428,62 @@ class VelociraptorMCPServer:
                 except Exception as e:
                     logger.error("Failed to list Windows artifacts: %s", e)
                     return [{"type": "text", "text": f"Error listing Windows artifacts: {str(e)}"}]
+
+        if "FindArtifactDetailsTool" not in self.config.server.disabled_tools:
+
+            @self.app.tool(
+                name="FindArtifactDetailsTool",
+                description="Find a Velociraptor artifact's name, description, and parameters by artifact name. Returns a summary for the specified artifact.",
+            )
+            async def find_artifact_details_tool(args: CollectArtifactDetailsArgs):
+                """Find a Velociraptor artifact's name, description, and parameters by artifact name.
+
+                Args:
+                    args: An object containing:
+                        - artifact_name (required): Name of the artifact to get details for
+
+                Returns:
+                    JSON object with artifact name, description, and parameters.
+                """
+                try:
+                    client = self._get_client()
+                    if client.stub is None:
+                        await client.authenticate()
+                    vql = f"""
+                    LET params(data) = SELECT name, description, type, default FROM data
+                    SELECT name, description, params(data=parameters) AS parameters
+                    FROM artifact_definitions()
+                    WHERE name = '{args.artifact_name}'
+                    """
+                    results = client.run_vql_query(vql)
+                    if not results:
+                        return [
+                            {
+                                "type": "text",
+                                "text": f"No artifact found with name: {args.artifact_name}",
+                            },
+                        ]
+                    artifact = results[0]
+                    # Only keep relevant parameter fields
+                    parameters = [
+                        {
+                            "name": p.get("name"),
+                            "description": p.get("description", ""),
+                            "type": p.get("type", ""),
+                            "default": p.get("default", None),
+                        }
+                        for p in artifact.get("parameters", [])
+                    ]
+                    summary = {
+                        "name": artifact.get("name"),
+                        "description": artifact.get("description", ""),
+                        "parameters": parameters,
+                    }
+                    response_text = json.dumps(summary, indent=2)
+                    return [{"type": "text", "text": self._safe_truncate(response_text)}]
+                except Exception as e:
+                    logger.error("Failed to find artifact details: %s", e)
+                    return [{"type": "text", "text": f"Error finding artifact details: {str(e)}"}]
 
         if "CollectArtifactTool" not in self.config.server.disabled_tools:
 

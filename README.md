@@ -345,6 +345,34 @@ The server exposes the following MCP tools for Velociraptor integration:
   {"args": {"artifact_name": "Windows.NTFS.MFT"}}
   ```
 
+### 9. ListLinuxArtifactNamesTool
+- **Purpose**: List only the names of available Linux artifacts in Velociraptor
+- **Parameters**: None
+- **Usage**: Returns a simple list of artifact names for Linux client artifacts
+- **Example**:
+  ```json
+  {"args": {}}
+  ```
+
+### 10. ListWindowsArtifactNamesTool
+- **Purpose**: List only the names of available Windows artifacts in Velociraptor
+- **Parameters**: None
+- **Usage**: Returns a simple list of artifact names for Windows client artifacts
+- **Example**:
+  ```json
+  {"args": {}}
+  ```
+
+### 11. FindArtifactDetailsTool
+- **Purpose**: Find a Velociraptor artifact's name, description, and parameters by artifact name
+- **Parameters**:
+  - `artifact_name` (required): Name of the artifact to get details for
+- **Usage**: Returns a summary for the specified artifact, including its name, description, and parameter list
+- **Example**:
+  ```json
+  {"args": {"artifact_name": "Windows.RemoteDesktop.RDPConnections"}}
+  ```
+
 ### Artifact Collection Workflow
 
 The tools work together to provide a complete artifact collection workflow:
