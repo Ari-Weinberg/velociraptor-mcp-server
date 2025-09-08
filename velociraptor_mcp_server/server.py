@@ -870,6 +870,8 @@ class VelociraptorMCPServer:
             # If it has an 'args' key, use that
             if "args" in raw_args:
                 return model_class(**raw_args["args"])
+            elif "arguments" in raw_args:
+                return model_class(**raw_args["arguments"])
             # Otherwise, assume the dict itself contains the arguments
             else:
                 return model_class(**raw_args)
